@@ -3,14 +3,13 @@ import re
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
-
 # ---------------------------------------------------------------------------
 # Load stock market reference data once at import time
 # ---------------------------------------------------------------------------
 _CSV_PATH = Path(__file__).parent / "stock_market.csv"
 
 try:
+    import pandas as pd
     _stock_df = pd.read_csv(_CSV_PATH, dtype=str).fillna("")
     # Build symbol → sector lookup (upper-cased symbols for robust matching)
     _SYMBOL_TO_INDUSTRY: dict[str, str] = dict(

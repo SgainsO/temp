@@ -116,7 +116,7 @@ def _parse_currency(val: Any) -> float:
         return 0.0
 
 
-_SKIP = {"pending activity", "account total", "—", "-", ""}
+_SKIP = {"pending activity", "account total", "grand total", "—", "-", ""}
 
 
 @app.post("/api/optimize-from-holdings")
