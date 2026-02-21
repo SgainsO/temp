@@ -3,17 +3,43 @@ import yfinance as yf
 from scipy.optimize import minimize
 
 
-def get_returns(tickers: list[str], period: str = "1y") -> np.ndarray:
-    data = yf.download(tickers, period=period, auto_adjust=True, progress=False)["Close"]
+def _fetch_clean_returns(tickers: list[str], period: str) -> tuple[np.ndarray, list[str]]:
+    """
+    Download closing prices, drop tickers with insufficient data, and return
+    daily returns as a numpy array alongside the valid ticker list.
+    """
+    raw = yf.download(tickers, period=period, auto_adjust=True, progress=False)["Close"]
+
     if len(tickers) == 1:
-        data = data.to_frame(name=tickers[0])
-    data = data[tickers]  # ensure consistent column order
-    return data.pct_change().dropna().values
+        raw = raw.to_frame(name=tickers[0])
+
+    # Keep only columns that were actually downloaded and have enough data
+    min_rows = 30
+    valid = [t for t in tickers if t in raw.columns and raw[t].notna().sum() >= min_rows]
+
+    if len(valid) < 2:
+        missing = [t for t in tickers if t not in valid]
+        raise ValueError(
+            f"Need at least 2 tickers with {min_rows}+ days of price data. "
+            f"Tickers with insufficient data: {missing}"
+        )
+
+    returns = raw[valid].pct_change(fill_method=None).dropna()
+
+    if len(returns) < min_rows:
+        raise ValueError(
+            f"Only {len(returns)} clean trading days after aligning tickers — need at least {min_rows}."
+        )
+
+    return returns.values, valid
 
 
 def sharpe_ratio(weights: np.ndarray, returns: np.ndarray, risk_free: float = 0.0) -> float:
     port_return = np.dot(returns.mean(axis=0), weights) * 252
-    port_vol = np.sqrt(weights @ (np.cov(returns.T) * 252) @ weights)
+    cov = np.cov(returns.T) * 252
+    port_vol = np.sqrt(weights @ cov @ weights)
+    if port_vol == 0:
+        return 0.0
     return (port_return - risk_free) / port_vol
 
 
@@ -36,18 +62,18 @@ def optimize_sharpe(
 
     Returns:
         {
-            "tickers":      list of tickers,
-            "weights":      optimized weights (sum to 1),
-            "sharpe":       maximized Sharpe ratio,
+            "tickers":       list of tickers used (may be a subset if some had no data),
+            "weights":       optimized weights (sum to 1),
+            "sharpe":        maximized Sharpe ratio,
             "annual_return": expected annual return,
-            "annual_vol":   expected annual volatility,
+            "annual_vol":    expected annual volatility,
         }
     """
-    n = len(tickers)
-    returns = get_returns(tickers, period)
+    returns, valid_tickers = _fetch_clean_returns(tickers, period)
+    n = len(valid_tickers)
 
-    x0 = np.full(n, 1.0 / n)           # equal-weight starting point
-    bounds = [(0.0, 1.0)] * n           # long-only
+    x0 = np.full(n, 1.0 / n)
+    bounds = [(0.0, 1.0)] * n
     constraints = {"type": "eq", "fun": lambda w: w.sum() - 1.0}
 
     result = minimize(
@@ -64,16 +90,16 @@ def optimize_sharpe(
         raise RuntimeError(f"Optimization failed: {result.message}")
 
     weights = result.x
-    sr = sharpe_ratio(weights, returns, risk_free)
+    sr      = sharpe_ratio(weights, returns, risk_free)
     ann_ret = np.dot(returns.mean(axis=0), weights) * 252
     ann_vol = np.sqrt(weights @ (np.cov(returns.T) * 252) @ weights)
 
     return {
-        "tickers": tickers,
-        "weights": {t: round(float(w), 6) for t, w in zip(tickers, weights)},
-        "sharpe": round(float(sr), 6),
+        "tickers":       valid_tickers,
+        "weights":       {t: round(float(w), 6) for t, w in zip(valid_tickers, weights)},
+        "sharpe":        round(float(sr), 6),
         "annual_return": round(float(ann_ret), 6),
-        "annual_vol": round(float(ann_vol), 6),
+        "annual_vol":    round(float(ann_vol), 6),
     }
 
 

@@ -139,15 +139,17 @@ def optimize_from_holdings(req: OptimizeFromHoldingsRequest):
             detail="Need at least 2 positions with a current value to optimize.",
         )
 
-    total = sum(values)
-    current_weights = {t: round(v / total, 6) for t, v in zip(tickers, values)}
-
     try:
         result = optimize_sharpe(tickers, req.period, req.risk_free)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    result["current_weights"] = current_weights
+    # Renormalize current weights to only the tickers the optimizer actually used
+    # (some may have been dropped due to missing/insufficient price data)
+    valid_set = set(result["tickers"])
+    valid_values = {t: v for t, v in zip(tickers, values) if t in valid_set}
+    valid_total = sum(valid_values.values()) or 1.0
+    result["current_weights"] = {t: round(v / valid_total, 6) for t, v in valid_values.items()}
     return result
 
 

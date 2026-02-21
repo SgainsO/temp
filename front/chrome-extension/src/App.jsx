@@ -30,95 +30,6 @@ function hhiCls(v)  { return v > 2500 ? 'red' : v > 1500 ? 'amber' : 'green' }
 function topCls(v)  { return v > 40   ? 'red' : v > 25   ? 'amber' : 'green' }
 function retCls(v)  { return v >= 0 ? 'green' : 'red' }
 
-// ── Optimize Chart Component ───────────────────────────────────────────────────
-
-function WeightChart({ optResult }) {
-  const { tickers, weights: opt, current_weights: cur,
-          sharpe, annual_return, annual_vol } = optResult
-
-  const allWeights = tickers.flatMap(t => [opt[t] ?? 0, cur[t] ?? 0])
-  const maxW = Math.max(...allWeights, 0.01)
-
-  const pct  = (w) => ((w ?? 0) * 100).toFixed(1)
-  const barW = (w) => `${((w ?? 0) / maxW) * 100}%`
-
-  return (
-    <>
-      {/* Perf stats row */}
-      <div className="opt-stats">
-        <div className="opt-stat-card">
-          <div className="opt-stat-label">Sharpe</div>
-          <div className={`opt-stat-num ${sharpe >= 1 ? 'green' : sharpe >= 0 ? 'cyan' : 'red'}`}>
-            {sharpe.toFixed(2)}
-          </div>
-        </div>
-        <div className="opt-stat-card">
-          <div className="opt-stat-label">Ann. Return</div>
-          <div className={`opt-stat-num ${retCls(annual_return)}`}>
-            {(annual_return * 100).toFixed(1)}%
-          </div>
-        </div>
-        <div className="opt-stat-card">
-          <div className="opt-stat-label">Ann. Vol</div>
-          <div className="opt-stat-num">{(annual_vol * 100).toFixed(1)}%</div>
-        </div>
-      </div>
-
-      {/* Bar chart */}
-      <div className="wt-chart">
-        <div className="wt-chart-header">
-          <span className="wt-chart-title">Recommended Weights</span>
-          <div className="wt-legend">
-            <span className="wt-legend-item">
-              <span className="wt-legend-dot cur" /> NOW
-            </span>
-            <span className="wt-legend-item">
-              <span className="wt-legend-dot opt" /> OPT
-            </span>
-          </div>
-        </div>
-
-        {tickers.map((ticker, i) => {
-          const curW = cur[ticker] ?? 0
-          const optW = opt[ticker] ?? 0
-          const delta = (optW - curW) * 100
-          const absDelta = Math.abs(delta)
-          const deltaCls = absDelta < 0.05 ? 'flat' : delta > 0 ? 'up' : 'down'
-          const deltaStr = absDelta < 0.05
-            ? '—'
-            : `${delta > 0 ? '+' : ''}${delta.toFixed(1)}%`
-
-          return (
-            <div key={ticker} className="wt-row" style={{ animationDelay: `${i * 0.04}s` }}>
-              <div className="wt-ticker-label">{ticker}</div>
-              <div className="wt-bar-group">
-
-                <div className="wt-bar-row">
-                  <span className="wt-bar-type">NOW</span>
-                  <div className="wt-track">
-                    <div className="wt-fill cur" style={{ '--bar-w': barW(curW) }} />
-                  </div>
-                  <span className="wt-pct cur">{pct(curW)}%</span>
-                  <span className="wt-delta flat" />
-                </div>
-
-                <div className="wt-bar-row">
-                  <span className="wt-bar-type">OPT</span>
-                  <div className="wt-track">
-                    <div className="wt-fill opt" style={{ '--bar-w': barW(optW) }} />
-                  </div>
-                  <span className="wt-pct opt">{pct(optW)}%</span>
-                  <span className={`wt-delta ${deltaCls}`}>{deltaStr}</span>
-                </div>
-
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </>
-  )
-}
 
 // ── Main App ──────────────────────────────────────────────────────────────────
 
@@ -253,16 +164,12 @@ function App() {
                   onClick={() => setTab('diversity')}>
             ◈ Diversity
           </button>
-          <button className={`tab-btn ${tab === 'optimize' ? 'active' : ''}`}
-                  onClick={() => setTab('optimize')}>
-            ◎ Optimize
-          </button>
         </div>
 
         {/* ══ DIVERSITY TAB ══════════════════════════════════════════════ */}
         {tab === 'diversity' && (
           <>
-            <button className="scan-btn" onClick={handleScrape} disabled={divLoading}>
+            <button className="scan-btn" onClick={handleScrape && handleOptimize} disabled={divLoading}>
               {divLoading
                 ? <>SCANNING<span className="dot">.</span><span className="dot">.</span><span className="dot">.</span></>
                 : '↺  RE-SCAN POSITIONS'}
@@ -362,44 +269,7 @@ function App() {
           </>
         )}
 
-        {/* ══ OPTIMIZE TAB ═══════════════════════════════════════════════ */}
-        {tab === 'optimize' && (
-          <>
-            <button className="opt-btn" onClick={handleOptimize} disabled={optLoading}>
-              {optLoading
-                ? <>OPTIMIZING<span className="dot">.</span><span className="dot">.</span><span className="dot">.</span></>
-                : '◎  RUN OPTIMIZER'}
-            </button>
 
-            {optLoading && (
-              <div className="loading-row">
-                <div className="spinner cyan" />
-                <span className="loading-label cyan">Running Sharpe optimization</span>
-              </div>
-            )}
-
-            {optError && <div className="error-bar">{optError}</div>}
-
-            {optResult && <WeightChart optResult={optResult} />}
-
-            {!optResult && !optLoading && !optError && (
-              <div className="empty">
-                <div className="empty-bars">
-                  {[14, 32, 20, 28, 10, 24, 18].map((h, i) => (
-                    <div key={i} className="empty-bar"
-                         style={{ height: `${h}px`, animationDelay: `${i * 0.12}s` }} />
-                  ))}
-                </div>
-                <div className="empty-label">
-                  {holdings.length > 0
-                    ? <>Ready — click RUN OPTIMIZER<span className="cursor" /></>
-                    : <>Scrape positions first on the<br />Diversity tab<span className="cursor" /></>
-                  }
-                </div>
-              </div>
-            )}
-          </>
-        )}
 
         {/* Footer */}
         <div className="footer">
