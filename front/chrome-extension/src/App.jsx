@@ -156,12 +156,14 @@ function App() {
     setDivError(null)
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-      if (!tab.url.includes('fidelity.com')) {
-        throw new Error('Navigate to a Fidelity positions page first.')
+      const onSupportedBroker =
+        tab.url.includes('fidelity.com') || tab.url.includes('sofi.com')
+      if (!onSupportedBroker) {
+        throw new Error('Navigate to a Fidelity or SoFi positions page first.')
       }
       chrome.tabs.sendMessage(tab.id, { type: 'SCRAPE_TRADES' }, (response) => {
         if (chrome.runtime.lastError) {
-          setDivError('Content script not ready — refresh the Fidelity page.')
+          setDivError('Content script not ready — refresh the Fidelity/SoFi page.')
           setDivLoading(false)
           return
         }
@@ -233,7 +235,7 @@ function App() {
         <div className="hdr">
           <div>
             <div className="brand-name">⬡ Hackalytics</div>
-            <div className="brand-sub">Fidelity Position Analyzer</div>
+            <div className="brand-sub">Fidelity + SoFi Position Analyzer</div>
           </div>
           <div className={`hdr-status ${isLive ? 'live' : ''}`}>
             <div className={`status-dot ${isLive ? 'live' : ''}`} />
@@ -357,7 +359,7 @@ function App() {
                 </div>
                 <div className="empty-label">
                   Awaiting position data<br />
-                  Open Fidelity → Positions tab
+                  Open Fidelity/SoFi → Positions tab
                   <span className="cursor" />
                 </div>
               </div>
