@@ -234,7 +234,6 @@ function scrapeFidelityTradeData() {
     })
   })
 
-<<<<<<< HEAD
   const allRows = Object.values(rowMap)
   console.log('[Diag] total rows in rowMap:', allRows.length)
   if (allRows.length > 0) {
