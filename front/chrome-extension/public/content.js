@@ -123,8 +123,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         body:    JSON.stringify({ data }),
       }).catch(err => console.error('[Hackalytics] Save failed:', err))
 
-      // Show optimizer deltas in floating panel on the Fidelity page
+      // Show optimizer deltas in floating panel on the broker page
       runOptimizer(data)
+
+      // Show volatility analysis in separate floating panel
+      runVolatility(data)
 
       sendResponse({ data })
     }).catch((err) => {
@@ -134,6 +137,172 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   return true
 })
+
+// ── Volatility panel ─────────────────────────────────────────────────────────
+
+// Annualized vol → plain-English risk tier + color
+function volRisk(annualVol) {
+  if (annualVol == null) return { label: 'Unknown', color: '#3a5578' }
+  const p = annualVol * 100
+  if (p > 60) return { label: 'Very High Risk', color: '#ff4757' }
+  if (p > 40) return { label: 'High Risk',      color: '#f5a623' }
+  if (p > 25) return { label: 'Moderate Risk',  color: '#f8c471' }
+  if (p > 15) return { label: 'Low-Mod Risk',   color: '#00d4ff' }
+  return               { label: 'Low Risk',      color: '#00ff88' }
+}
+
+// Annualized vol → typical monthly swing (÷ √12)
+function toMonthly(annualVol) {
+  if (annualVol == null) return null
+  return Math.round(annualVol / Math.sqrt(12) * 100)
+}
+
+function showVolatilityPanel(volData) {
+  const existing = document.getElementById('hka-vol-panel')
+  if (existing) existing.remove()
+
+  const analysis  = volData.volatility_analysis || {}
+  const perTicker = analysis.annualized_volatility || {}
+  const spikes    = analysis.spike_tickers || []
+
+  const entries = Object.entries(perTicker)
+  if (entries.length === 0) return
+
+  entries.sort((a, b) => (b[1].vol20 || 0) - (a[1].vol20 || 0))
+
+  const panel = document.createElement('div')
+  panel.id = 'hka-vol-panel'
+  panel.style.cssText = [
+    'position:fixed',
+    'bottom:24px',
+    'left:24px',
+    'z-index:999999',
+    'background:#0d1a2a',
+    'border:1px solid #1e3a5a',
+    'border-radius:8px',
+    'padding:12px 14px',
+    'font-family:ui-monospace,monospace',
+    'font-size:12px',
+    'color:#c9d8ed',
+    'box-shadow:0 4px 24px rgba(0,0,0,0.5)',
+    'min-width:280px',
+    'max-height:420px',
+    'overflow-y:auto',
+  ].join(';')
+
+  // Title
+  const title = document.createElement('div')
+  title.style.cssText = 'font-size:10px;letter-spacing:0.12em;color:#2e6a9a;text-transform:uppercase;margin-bottom:8px;padding-right:16px;'
+  title.textContent = '⬡ Hackalytics — Risk Report'
+  panel.appendChild(title)
+
+  // Plain-English alert
+  const alertEl = document.createElement('div')
+  if (spikes.length > 0) {
+    alertEl.style.cssText = 'font-size:10px;color:#ff4757;background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.25);border-radius:4px;padding:6px 8px;margin-bottom:8px;line-height:1.6;'
+    alertEl.textContent = `⚠  ${spikes.length} of your stocks are moving much more than their recent average. You may want to reduce your exposure to ${spikes.join(', ')}.`
+  } else {
+    alertEl.style.cssText = 'font-size:10px;color:#00ff88;background:rgba(0,255,136,0.06);border:1px solid rgba(0,255,136,0.2);border-radius:4px;padding:6px 8px;margin-bottom:8px;'
+    alertEl.textContent = '✓  All stocks are moving at their expected pace — no unusual activity.'
+  }
+  panel.appendChild(alertEl)
+
+  // Column header
+  const hdr = document.createElement('div')
+  hdr.style.cssText = 'display:grid;grid-template-columns:48px 1fr auto;gap:8px;font-size:9px;color:#2e4a6a;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px;padding-bottom:4px;border-bottom:1px solid #1e3050;'
+  hdr.innerHTML = '<span>Ticker</span><span>Risk Level</span><span>Typical Monthly Swing</span>'
+  panel.appendChild(hdr)
+
+  // Per-ticker rows
+  entries.forEach(([ticker, m]) => {
+    const isSpike  = m.volatility_spike
+    const risk     = volRisk(m.vol20)
+    const monthly  = toMonthly(m.vol20)
+    const swingTxt = monthly != null ? `~${monthly}% / month` : '—'
+    const spikeTxt = isSpike ? '  ⚡ recently spiked up' : ''
+    const pattern  = m.pattern || {}
+
+    const row = document.createElement('div')
+    row.style.cssText = `display:grid;grid-template-columns:48px 1fr auto;gap:8px;padding:4px 0 2px;${isSpike ? 'background:rgba(255,71,87,0.04);border-radius:3px;padding:4px 4px 2px;' : ''}`
+
+    const symEl = document.createElement('span')
+    symEl.style.cssText = 'font-weight:700;color:#8aaccc;'
+    symEl.textContent = ticker
+
+    const riskEl = document.createElement('span')
+    riskEl.style.cssText = `font-weight:${isSpike ? '700' : '400'};color:${risk.color};`
+    riskEl.textContent = risk.label + spikeTxt
+
+    const swingEl = document.createElement('span')
+    swingEl.style.cssText = `color:${risk.color};font-weight:700;white-space:nowrap;`
+    swingEl.textContent = swingTxt
+
+    row.appendChild(symEl)
+    row.appendChild(riskEl)
+    row.appendChild(swingEl)
+    panel.appendChild(row)
+
+    // Plain-English pattern description (sub-row)
+    if (pattern.description) {
+      const patEl = document.createElement('div')
+      patEl.style.cssText = 'font-size:9px;color:#3a6a8a;padding:0 0 5px 56px;line-height:1.5;border-bottom:1px solid rgba(255,255,255,0.04);'
+      patEl.textContent = `↳ ${pattern.description}`
+      panel.appendChild(patEl)
+    } else {
+      // just add the separator border
+      const sep = document.createElement('div')
+      sep.style.cssText = 'border-bottom:1px solid rgba(255,255,255,0.04);margin-bottom:1px;'
+      panel.appendChild(sep)
+    }
+  })
+
+  // Footer
+  const footer = document.createElement('div')
+  footer.style.cssText = 'margin-top:8px;padding-top:6px;border-top:1px solid #1e3050;font-size:9px;color:#3a5578;line-height:1.5;'
+  footer.textContent = '"Monthly swing" = how much this stock might typically move up or down in a single month.'
+  panel.appendChild(footer)
+
+  // Close button
+  const close = document.createElement('button')
+  close.textContent = '✕'
+  close.style.cssText = 'position:absolute;top:8px;right:10px;background:none;border:none;color:#2e4a6a;cursor:pointer;font-size:12px;padding:0;'
+  close.onclick = () => panel.remove()
+  panel.appendChild(close)
+
+  document.body.appendChild(panel)
+}
+
+// ── Volatility call ───────────────────────────────────────────────────────────
+
+const VOL_SKIP = new Set(['pending activity', 'account total', 'grand total', 'cash', 'account:', '—', '-', ''])
+
+async function runVolatility(holdingsData) {
+  const tickers = [...new Set(
+    holdingsData
+      .map(h => (h.symbol || '').trim().toUpperCase())
+      .filter(sym => sym && !VOL_SKIP.has(sym.toLowerCase()))
+  )]
+  if (tickers.length === 0) return
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/volatality_anal`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ tickers, period: '1y' }),
+    })
+    if (!resp.ok) {
+      console.warn('[Hackalytics] Volatility returned', resp.status)
+      return
+    }
+    const result = await resp.json()
+    console.log('[Hackalytics] volatility:', result)
+    showVolatilityPanel(result)
+  } catch (err) {
+    console.error('[Hackalytics] Volatility call failed:', err)
+  }
+}
+
+
 
 // ── Scraping helpers ─────────────────────────────────────────────────────────
 
