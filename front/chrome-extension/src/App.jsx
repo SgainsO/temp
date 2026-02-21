@@ -1,146 +1,250 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 
+const RATING_CLASS = {
+  'Well Diversified': 'green',
+  'Moderate':         'amber',
+  'Concentrated':     'red',
+  'No Data':          'gray',
+}
+
+function barColor(pct) {
+  if (pct >= 40) return 'linear-gradient(90deg, #ff4757 0%, #ff6b81 100%)'
+  if (pct >= 25) return 'linear-gradient(90deg, #f5a623 0%, #f8c471 100%)'
+  return 'linear-gradient(90deg, #00ff88 0%, #00d4ff 100%)'
+}
+
+function hhiColor(hhi) {
+  if (hhi > 2500) return 'red'
+  if (hhi > 1500) return 'amber'
+  return 'green'
+}
+
+function topColor(pct) {
+  if (pct > 40) return 'red'
+  if (pct > 25) return 'amber'
+  return 'green'
+}
+
+const TICKERS = [
+  { sym: 'SPY',  val: '+0.42%', up: true  },
+  { sym: 'QQQ',  val: '+0.89%', up: true  },
+  { sym: 'VTI',  val: '+0.31%', up: true  },
+  { sym: 'BTC',  val: '-1.24%', up: false },
+  { sym: 'GLD',  val: '+0.07%', up: true  },
+  { sym: 'IWM',  val: '-0.18%', up: false },
+]
+
 function App() {
-  const [holdings, setHoldings] = useState([]);
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [holdings, setHoldings] = useState([])
+  const [result,   setResult]   = useState(null)
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState(null)
 
-  // Automatically send to Python backend whenever holdings are updated (via scrape or manual)
   useEffect(() => {
-    if (holdings.length > 0) {
-      sendToPythonBackend(holdings);
-    } else {
-      setResult(null);
-    }
-  }, [holdings]);
+    if (holdings.length > 0) sendToPythonBackend(holdings)
+    else setResult(null)
+  }, [holdings])
 
-  // 1. The Scraper Trigger (Talks to Fidelity via content.js)
   const handleScrape = async () => {
-    setLoading(true);
-    setError(null);
-    
+    setLoading(true)
+    setError(null)
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
       if (!tab.url.includes('fidelity.com')) {
-        throw new Error("Please open a Fidelity positions page first.");
+        throw new Error('Navigate to a Fidelity positions page first.')
       }
-
-      // Send message to content.js to start scraping
       chrome.tabs.sendMessage(tab.id, { type: 'SCRAPE_TRADES' }, (response) => {
         if (chrome.runtime.lastError) {
-          setError("Content script not loaded. Refresh the Fidelity page.");
-          setLoading(false);
-          return;
+          setError('Content script not ready — refresh the Fidelity page.')
+          setLoading(false)
+          return
         }
-        
-        if (response && response.data) {
-          setHoldings(response.data); // This triggers the useEffect to call Python
+        if (response?.data?.length > 0) {
+          setHoldings(response.data)
         } else {
-          setError("No data found on page. Ensure you are on the Positions tab.");
-          setLoading(false);
+          setError('No positions found. Open the Positions tab fully.')
+          setLoading(false)
         }
-      });
+      })
     } catch (err) {
-      setError(err.message);
-      setLoading(false);
+      setError(err.message)
+      setLoading(false)
     }
-  };
+  }
 
-  // 2. The Python API Call
   const sendToPythonBackend = async (data) => {
-    setLoading(true);
+    setLoading(true)
     try {
       const resp = await fetch('http://localhost:8787/api/diversity', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ holdings: data })
-      });
-      
-      if (!resp.ok) throw new Error(`Python Server Error: ${resp.status}`);
-      
-      const analysis = await resp.json();
-      setResult(analysis);
-    } catch (err) {
-      setError("Python backend unreachable. Run 'python index.py' in /server/src");
+        body:    JSON.stringify({ holdings: data }),
+      })
+      if (!resp.ok) throw new Error(`Server ${resp.status}`)
+      setResult(await resp.json())
+    } catch {
+      setError('Backend unreachable — run: python main.py')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  const statusColor = {
-    'Well Diversified': '#10b981',
-    'Moderate': '#f59e0b',
-    'Concentrated': '#ef4444',
-    'No Data': '#666'
-  };
+  const cls = result ? (RATING_CLASS[result.metrics.rating] ?? 'gray') : null
 
   return (
-    <div className="container">
-      <h3 style={{ margin: '0 0 4px 0', fontSize: '16px' }}>Fidelity Diversity</h3>
-      <p className="instructions" style={{ marginBottom: '8px' }}>Analyze your current positions.</p>
+    <div className="terminal">
 
-      {/* Main Action Button */}
-      <button 
-        className="action-btn" 
-        onClick={handleScrape} 
-        disabled={loading}
-        style={{ width: '100%', marginBottom: '12px' }}
-      >
-        {loading ? 'Processing...' : 'Scrape Fidelity Data'}
+      {/* ── Header ───────────────────────────────────────────────────── */}
+      <div className="hdr">
+        <div className="hdr-brand">
+          <div className="brand-name">
+            <span className="brand-hex">⬡ </span>HACKALYTICS
+          </div>
+          <div className="brand-sub">Fidelity Position Analyzer</div>
+        </div>
+        <div className={`hdr-status ${result ? 'live' : ''}`}>
+          <div className={`status-dot ${result ? 'live' : ''}`} />
+          {result ? 'LIVE' : 'IDLE'}
+        </div>
+      </div>
+
+      {/* ── Decorative Ticker Strip ───────────────────────────────────── */}
+      <div className="ticker-strip">
+        {TICKERS.map(({ sym, val, up }) => (
+          <span key={sym} className="tick">
+            {sym} <span className={up ? 'up' : 'down'}>{val}</span>
+          </span>
+        ))}
+      </div>
+
+      {/* ── Scan Button ──────────────────────────────────────────────── */}
+      <button className="scan-btn" onClick={handleScrape} disabled={loading}>
+        {loading
+          ? <>SCANNING<span className="dot">.</span><span className="dot">.</span><span className="dot">.</span></>
+          : '▶  SCAN POSITIONS'}
       </button>
 
-      {error && <p style={{ color: '#ef4444', fontSize: '11px', marginBottom: '8px' }}>{error}</p>}
+      {/* ── Loading Indicator ─────────────────────────────────────────── */}
+      {loading && (
+        <div className="loading-row">
+          <div className="spinner" />
+          <span className="loading-label">Analyzing portfolio structure</span>
+        </div>
+      )}
 
-      {/* Results from Python Backend */}
+      {/* ── Error ────────────────────────────────────────────────────── */}
+      {error && <div className="error-bar">{error}</div>}
+
+      {/* ── Rating Card ──────────────────────────────────────────────── */}
       {result && (
-        <div style={{
-          padding: '12px',
-          borderRadius: '8px',
-          backgroundColor: '#f9fafb',
-          border: `2px solid ${statusColor[result.metrics.rating] || '#666'}`,
-          textAlign: 'center',
-          marginBottom: '12px'
-        }}>
-          <div style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase' }}>Diversity Rating</div>
-          <div style={{ fontSize: '18px', fontWeight: 'bold', color: statusColor[result.metrics.rating] }}>
-            {result.metrics.rating}
-          </div>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginTop: '8px', fontSize: '11px', color: '#444' }}>
-            <div style={{ textAlign: 'left' }}>HHI: <b>{result.metrics.hhi}</b></div>
-            <div style={{ textAlign: 'right' }}>Eff. Sectors: <b>{result.metrics.effective_industries}</b></div>
-            <div style={{ textAlign: 'left' }}>Total: <b>${result.total_value.toLocaleString()}</b></div>
-            <div style={{ textAlign: 'right' }}>Top: <b>{result.metrics.top_industry_weight_pct}%</b></div>
+        <div className={`rating-card ${cls}`}>
+          <div className="rating-eyebrow">Diversification Rating</div>
+          <div className={`rating-value ${cls}`}>{result.metrics.rating}</div>
+          <div className="rating-divider" />
+          <div className="portfolio-value">
+            Portfolio Value&nbsp;&nbsp;
+            <span>
+              ${result.total_value.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
           </div>
         </div>
       )}
 
-      {/* Breakdown List */}
-      {result && result.industry_breakdown.length > 0 && (
-        <div style={{ borderTop: '1px solid #eee', paddingTop: '8px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#666', marginBottom: '4px' }}>Sector Breakdown:</div>
-          {result.industry_breakdown.slice(0, 5).map((item, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '2px 0' }}>
-              <span style={{ color: '#333' }}>{item.industry}</span>
-              <span style={{ fontWeight: 'bold' }}>{item.weight_pct}%</span>
+      {/* ── Metrics Grid ─────────────────────────────────────────────── */}
+      {result && (
+        <div className="metrics-grid">
+          <div className="metric-card">
+            <div className="metric-label">HHI Score</div>
+            <div className={`metric-num ${hhiColor(result.metrics.hhi)}`}>
+              {result.metrics.hhi.toLocaleString()}
+            </div>
+            <div className="metric-sub">Concentration index</div>
+          </div>
+
+          <div className="metric-card">
+            <div className="metric-label">Eff. Sectors</div>
+            <div className="metric-num cyan">
+              {result.metrics.effective_industries}
+            </div>
+            <div className="metric-sub">Unique exposure</div>
+          </div>
+
+          <div className="metric-card">
+            <div className="metric-label">Top Weight</div>
+            <div className={`metric-num ${topColor(result.metrics.top_industry_weight_pct)}`}>
+              {result.metrics.top_industry_weight_pct}%
+            </div>
+            <div className="metric-sub">Largest sector</div>
+          </div>
+
+          <div className="metric-card">
+            <div className="metric-label">Entropy</div>
+            <div className="metric-num cyan">
+              {result.metrics.entropy}
+            </div>
+            <div className="metric-sub">Shannon index</div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Sector Breakdown ─────────────────────────────────────────── */}
+      {result?.industry_breakdown?.length > 0 && (
+        <div className="sectors">
+          <div className="sec-header">
+            <span className="sec-title">Sector Breakdown</span>
+            <span className="sec-count">{result.industry_breakdown.length} sectors</span>
+          </div>
+
+          {result.industry_breakdown.map((item, i) => (
+            <div key={i} className="sector-row">
+              <div className="sector-top">
+                <span className="sector-rank">{String(i + 1).padStart(2, '0')}</span>
+                <span className="sector-name">{item.industry}</span>
+                <span className="sector-val">
+                  ${(item.value / 1000).toFixed(1)}k
+                </span>
+                <span className="sector-pct">{item.weight_pct}%</span>
+              </div>
+              <div className="bar-track">
+                <div
+                  className="bar-fill"
+                  style={{
+                    '--w': `${item.weight_pct}%`,
+                    background: barColor(item.weight_pct),
+                  }}
+                />
+              </div>
             </div>
           ))}
-          {result.industry_breakdown.length > 5 && (
-            <div style={{ fontSize: '10px', color: '#999', textAlign: 'center', marginTop: '4px' }}>
-              + {result.industry_breakdown.length - 5} more sectors
-            </div>
-          )}
         </div>
       )}
-      
+
+      {/* ── Empty State ──────────────────────────────────────────────── */}
       {!result && !loading && (
-        <div style={{ textAlign: 'center', padding: '20px', color: '#999', fontSize: '12px', border: '1px dashed #ccc', borderRadius: '8px' }}>
-          No data loaded yet.
+        <div className="empty">
+          <div className="empty-chart">
+            {[18, 28, 22, 35, 14].map((h, i) => (
+              <div key={i} className="empty-bar" style={{ height: `${h}px`, animationDelay: `${i * 0.15}s` }} />
+            ))}
+          </div>
+          <div className="empty-label">
+            Awaiting position data<br />
+            Open Fidelity → Positions tab
+            <span className="cursor" />
+          </div>
         </div>
       )}
+
+      {/* ── Footer ───────────────────────────────────────────────────── */}
+      <div className="footer">
+        <span>Hackalytics v0.1</span>
+        <span>◉ localhost:8787</span>
+      </div>
+
     </div>
   )
 }
