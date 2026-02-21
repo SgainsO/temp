@@ -12,7 +12,8 @@
   ],
   "host_permissions": [
     "http://localhost:8787/*",
-    "https://*.fidelity.com/*"
+    "https://*.fidelity.com/*",
+    "https://*.sofi.com/*"
   ],
   "content_scripts": [
     {
