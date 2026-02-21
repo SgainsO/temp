@@ -29,7 +29,7 @@ function App() {
       }
 
       // Send message to content.js to start scraping
-      chrome.tabs.sendMessage(tab.id, { action: "SCRAPE_FIDELITY" }, (response) => {
+      chrome.tabs.sendMessage(tab.id, { type: 'SCRAPE_TRADES' }, (response) => {
         if (chrome.runtime.lastError) {
           setError("Content script not loaded. Refresh the Fidelity page.");
           setLoading(false);

@@ -1,3 +1,5 @@
+const API_BASE = 'http://localhost:8787'
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'SCRAPE_TRADES') {
     scrapeWithRetry().then((data) => {
@@ -15,6 +17,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         'Cost Basis':    row.costBasis    || '—',
       }))
       console.table(table)
+
+      // POST scraped holdings to the FastAPI server, which appends them to holdings.txt
+      fetch(`${API_BASE}/api/save-holdings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data }),
+      })
+        .then((res) => res.json())
+        .then((res) => console.log('[Trade Scraper] Saved to file:', res))
+        .catch((err) => console.error('[Trade Scraper] Failed to save to file:', err))
+
       sendResponse({ data })
     }).catch((err) => {
       console.error('[Trade Scraper] Uncaught error:', err)
