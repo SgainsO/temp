@@ -1,5 +1,6 @@
 import json
 import math
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -37,6 +38,12 @@ class OptimizeRequest(BaseModel):
 
 class SaveHoldingsRequest(BaseModel):
     data: list[Any]
+
+
+class OptimizeFromHoldingsRequest(BaseModel):
+    data: list[Any]
+    period: str = "2y"
+    risk_free: float = 0.0
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -96,6 +103,52 @@ def save_holdings(req: SaveHoldingsRequest):
     with open(HOLDINGS_FILE, "w") as f:
         f.write(json.dumps(entry) + "\n")
     return {"ok": True, "rows_saved": len(req.data)}
+
+
+def _parse_currency(val: Any) -> float:
+    """'$1,234.56' → 1234.56, handles ints/floats too."""
+    if isinstance(val, (int, float)):
+        return float(val)
+    cleaned = re.sub(r"[^\d.]", "", str(val))
+    try:
+        return float(cleaned)
+    except ValueError:
+        return 0.0
+
+
+_SKIP = {"pending activity", "account total", "—", "-", ""}
+
+
+@app.post("/api/optimize-from-holdings")
+def optimize_from_holdings(req: OptimizeFromHoldingsRequest):
+    tickers: list[str] = []
+    values:  list[float] = []
+
+    for h in req.data:
+        sym = str(h.get("symbol", "") or "").strip().upper()
+        if sym.lower() in _SKIP or not sym:
+            continue
+        val = _parse_currency(h.get("currentValue", 0))
+        if val > 0:
+            tickers.append(sym)
+            values.append(val)
+
+    if len(tickers) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Need at least 2 positions with a current value to optimize.",
+        )
+
+    total = sum(values)
+    current_weights = {t: round(v / total, 6) for t, v in zip(tickers, values)}
+
+    try:
+        result = optimize_sharpe(tickers, req.period, req.risk_free)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    result["current_weights"] = current_weights
+    return result
 
 
 # ── Dev entry point ───────────────────────────────────────────────────────────
