@@ -3,15 +3,11 @@ import yfinance as yf
 from scipy.optimize import minimize
 
 
-def get_close_prices(tickers: list[str], period: str = "1y"):
+def get_returns(tickers: list[str], period: str = "1y") -> np.ndarray:
     data = yf.download(tickers, period=period, auto_adjust=True, progress=False)["Close"]
     if len(tickers) == 1:
         data = data.to_frame(name=tickers[0])
-    return data[tickers]  # ensure consistent column order
-
-
-def get_returns(tickers: list[str], period: str = "1y") -> np.ndarray:
-    data = get_close_prices(tickers, period)
+    data = data[tickers]  # ensure consistent column order
     return data.pct_change().dropna().values
 
 
@@ -23,47 +19,6 @@ def sharpe_ratio(weights: np.ndarray, returns: np.ndarray, risk_free: float = 0.
 
 def neg_sharpe(weights, returns, risk_free):
     return -sharpe_ratio(weights, returns, risk_free)
-
-
-def compute_volatility_signals(close_prices) -> dict:
-    daily_returns = close_prices.pct_change().dropna()
-    if daily_returns.empty:
-        return {
-            "annualized_volatility": {},
-            "spike_tickers": [],
-            "portfolio_risk_alert": None,
-        }
-
-    vol20 = daily_returns.rolling(20).std().iloc[-1] * np.sqrt(252)
-    vol120 = daily_returns.rolling(120).std().iloc[-1] * np.sqrt(252)
-
-    ticker_metrics = {}
-    spike_tickers = []
-
-    for ticker in daily_returns.columns:
-        v20 = vol20.get(ticker, np.nan)
-        v120 = vol120.get(ticker, np.nan)
-        spike = bool(np.isfinite(v20) and np.isfinite(v120) and v20 > 1.5 * v120)
-
-        if spike:
-            spike_tickers.append(ticker)
-
-        ticker_metrics[ticker] = {
-            "vol20": round(float(v20), 6) if np.isfinite(v20) else None,
-            "vol120": round(float(v120), 6) if np.isfinite(v120) else None,
-            "volatility_spike": spike,
-        }
-
-    risk_alert = None
-    if spike_tickers:
-        joined = ", ".join(spike_tickers)
-        risk_alert = f"Volatility spike in {joined}; portfolio risk elevated."
-
-    return {
-        "annualized_volatility": ticker_metrics,
-        "spike_tickers": spike_tickers,
-        "portfolio_risk_alert": risk_alert,
-    }
 
 
 def optimize_sharpe(
@@ -89,8 +44,7 @@ def optimize_sharpe(
         }
     """
     n = len(tickers)
-    close_prices = get_close_prices(tickers, period)
-    returns = close_prices.pct_change().dropna().values
+    returns = get_returns(tickers, period)
 
     x0 = np.full(n, 1.0 / n)           # equal-weight starting point
     bounds = [(0.0, 1.0)] * n           # long-only
@@ -113,7 +67,6 @@ def optimize_sharpe(
     sr = sharpe_ratio(weights, returns, risk_free)
     ann_ret = np.dot(returns.mean(axis=0), weights) * 252
     ann_vol = np.sqrt(weights @ (np.cov(returns.T) * 252) @ weights)
-    vol_signals = compute_volatility_signals(close_prices)
 
     return {
         "tickers": tickers,
@@ -121,7 +74,6 @@ def optimize_sharpe(
         "sharpe": round(float(sr), 6),
         "annual_return": round(float(ann_ret), 6),
         "annual_vol": round(float(ann_vol), 6),
-        "volatility_analysis": vol_signals,
     }
 
 
