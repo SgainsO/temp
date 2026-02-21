@@ -1,6 +1,23 @@
 import math
 import re
+from pathlib import Path
 from typing import Any
+
+import pandas as pd
+
+# ---------------------------------------------------------------------------
+# Load stock market reference data once at import time
+# ---------------------------------------------------------------------------
+_CSV_PATH = Path(__file__).parent / "stock_market.csv"
+
+try:
+    _stock_df = pd.read_csv(_CSV_PATH, dtype=str).fillna("")
+    # Build symbol → sector lookup (upper-cased symbols for robust matching)
+    _SYMBOL_TO_INDUSTRY: dict[str, str] = dict(
+        zip(_stock_df["symbol"].str.upper(), _stock_df["sector"])
+    )
+except Exception:
+    _SYMBOL_TO_INDUSTRY = {}
 
 
 def clean_holdings(raw_holdings: list) -> list:
@@ -28,7 +45,12 @@ def clean_holdings(raw_holdings: list) -> list:
         return []
     result: list[dict[str, Any]] = []
     for h in raw_holdings:
-        industry = str(h.get("industry", "") or "").strip() or "Unknown"
+        # Prefer CSV lookup by symbol; fall back to whatever the scraper sent
+        symbol = str(h.get("symbol", "") or "").strip().upper()
+        industry = _SYMBOL_TO_INDUSTRY.get(symbol, "")
+        if not industry:
+            industry = str(h.get("industry", "") or "").strip()
+        industry = industry or "Unknown"
         # look for any supported value key
         value_field: Any = None
         for key in ("value", "currentValue", "curVal", "cur_val", "current_value"):
