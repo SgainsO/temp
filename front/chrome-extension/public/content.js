@@ -1,6 +1,27 @@
 const API_BASE = 'http://localhost:8787'
 
-// ── Floating delta panel ─────────────────────────────────────────────────────
+const FIELD_MAP = {
+  sym: 'symbol',
+  curVal: 'currentValue',
+  actPer: 'pctOfAccount',
+  qty: 'quantity',
+  cstBasTot: 'costBasis',
+}
+
+const FIELD_ALIASES = {
+  symbol: ['symbol', 'sym', 'ticker'],
+  currentValue: ['currentValue', 'curVal', 'marketValue', 'value', 'totalValue', 'positionValue'],
+  pctOfAccount: ['pctOfAccount', 'actPer', 'allocation', 'weight'],
+  quantity: ['quantity', 'qty', 'shares'],
+  costBasis: ['costBasis', 'cstBasTot', 'cost'],
+}
+
+const SKIP_SYMBOLS = new Set(['pending activity', 'account total', '-', '--', ''])
+
+const BROKER_CONFIG = {
+  fidelity: { domains: ['fidelity.com'] },
+  sofi: { domains: ['sofi.com'] },
+}
 
 function showAllocationPanel(allocations) {
   const existing = document.getElementById('hka-panel')
@@ -31,7 +52,7 @@ function showAllocationPanel(allocations) {
 
   const title = document.createElement('div')
   title.style.cssText = 'font-size:10px;letter-spacing:0.12em;color:#2e6a9a;text-transform:uppercase;margin-bottom:8px;padding-right:16px;'
-  title.textContent = '⬡ Hackalytics — Recommended Allocation'
+  title.textContent = 'Hackalytics: Recommended Allocation'
   panel.appendChild(title)
 
   const hdr = document.createElement('div')
@@ -64,7 +85,7 @@ function showAllocationPanel(allocations) {
     })
 
   const close = document.createElement('button')
-  close.textContent = '✕'
+  close.textContent = 'x'
   close.style.cssText = 'position:absolute;top:8px;right:10px;background:none;border:none;color:#2e4a6a;cursor:pointer;font-size:12px;padding:0;'
   close.onclick = () => panel.remove()
   panel.appendChild(close)
@@ -72,21 +93,19 @@ function showAllocationPanel(allocations) {
   document.body.appendChild(panel)
 }
 
-// ── Optimizer call ───────────────────────────────────────────────────────────
-
 async function runOptimizer(holdingsData) {
   try {
     const resp = await fetch(`${API_BASE}/api/optimize-from-holdings`, {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ data: holdingsData }),
+      body: JSON.stringify({ data: holdingsData }),
     })
     if (!resp.ok) {
       console.warn('[Hackalytics] Optimizer returned', resp.status)
       return
     }
     const result = await resp.json()
-    const weights    = result.weights
+    const weights = result.weights
     const curWeights = result.current_weights
     if (!weights || !curWeights) return
 
@@ -94,18 +113,14 @@ async function runOptimizer(holdingsData) {
     for (const sym of result.tickers) {
       allocations[sym.toUpperCase()] = {
         curPct: (curWeights[sym] ?? 0) * 100,
-        optPct: (weights[sym]    ?? 0) * 100,
+        optPct: (weights[sym] ?? 0) * 100,
       }
     }
-
-    console.log('[Hackalytics] allocations:', allocations)
     showAllocationPanel(allocations)
   } catch (err) {
     console.error('[Hackalytics] Optimizer call failed:', err)
   }
 }
-
-// ── Message listener ─────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'SCRAPE_TRADES') {
@@ -116,16 +131,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return
       }
 
-      // Save holdings
       fetch(`${API_BASE}/api/save-holdings`, {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ data }),
-      }).catch(err => console.error('[Hackalytics] Save failed:', err))
+        body: JSON.stringify({ data }),
+      }).catch((err) => console.error('[Hackalytics] Save failed:', err))
 
-      // Show optimizer deltas in floating panel on the Fidelity page
       runOptimizer(data)
-
       sendResponse({ data })
     }).catch((err) => {
       console.error('[Hackalytics] Scrape error:', err)
@@ -135,47 +147,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true
 })
 
-// ── Scraping helpers ─────────────────────────────────────────────────────────
-
-const FIELD_MAP = {
-  sym:       'symbol',
-  curVal:    'currentValue',
-  actPer:    'pctOfAccount',
-  qty:       'quantity',
-  cstBasTot: 'costBasis',
-}
-
-const SKIP_SYMBOLS = ['pending activity', 'account total']
-const BROKER_HINTS = {
-  fidelity: ['fidelity.com'],
-  sofi: ['sofi.com'],
-}
-
-/**
- * Inspect the current page's hostname and return which broker we're on.
- *
- * Known values:
- *   'fidelity'  – hostname contains one of the fidelity hints
- *   'sofi'      – hostname contains one of the sofi hints
- *   'unknown'   – no match, or a broker we don't support yet
- *
- * You can run this from the console yourself to verify:
- *   chrome.devtools.inspectedWindow.eval('detectBroker()', console.log)
- */
 function detectBroker() {
   const host = (location.hostname || '').toLowerCase()
-  if (BROKER_HINTS.fidelity.some((d) => host.includes(d))) return 'fidelity'
-  if (BROKER_HINTS.sofi.some((d) => host.includes(d))) return 'sofi'
+  for (const [broker, cfg] of Object.entries(BROKER_CONFIG)) {
+    if (cfg.domains.some((d) => host.includes(d))) return broker
+  }
   return 'unknown'
-}
-
-// expose helpers for manual debugging via console
-window._hackalytics = {
-  detectBroker,
-  scrapeTradeData,
-  scrapeFidelityTradeData,
-  scrapeSofiTradeData,
-  scrapeFlexTableTradeData,
 }
 
 function getAllDocuments() {
@@ -185,78 +162,11 @@ function getAllDocuments() {
       if (iframe.contentDocument) {
         docs.push({ doc: iframe.contentDocument, label: `iframe[${i}]` })
       }
-    } catch (e) {}
+    } catch (e) {
+      console.log('[Diag] iframe blocked (cross-origin):', iframe.src)
+    }
   })
   return docs
-}
-
-function scrapeTradeData() {
-  const broker = detectBroker()
-  console.log('[Diag] detected broker:', broker)
-
-  if (broker === 'sofi') {
-    const sofiData = scrapeSofiTradeData()
-    if (sofiData.length > 0) return sofiData
-    console.log('[Diag] SoFi parser returned 0 rows, trying Fidelity parser fallback')
-  }
-
-  if (broker === 'fidelity') {
-    const fidData = scrapeFidelityTradeData()
-    if (fidData.length > 0) return fidData
-    console.log('[Diag] Fidelity parser returned 0 rows, trying SoFi parser fallback')
-    const sofiData = scrapeSofiTradeData()
-    if (sofiData.length > 0) return sofiData
-  }
-
-  // if broker unknown or both parsers failed just try both generally
-  return scrapeFidelityTradeData()
-}
-
-function scrapeFidelityTradeData() {
-  const allDocs = getAllDocuments()
-  const rowMap  = {}
-
-  allDocs.forEach(({ doc }) => {
-    doc.querySelectorAll('.ag-row').forEach((row) => {
-      const idx = row.getAttribute('row-index')
-      if (idx === null) return
-      if (!rowMap[idx]) rowMap[idx] = {}
-
-      row.querySelectorAll('[col-id]').forEach((cell) => {
-        const colId = cell.getAttribute('col-id')
-        if (!colId) return
-        const value = (cell.innerText || '').split('\n').map(s => s.trim()).filter(Boolean)[0] || ''
-        if (!value) return
-        rowMap[idx][colId] = value
-        const friendly = FIELD_MAP[colId]
-        if (friendly && !rowMap[idx][friendly]) rowMap[idx][friendly] = value
-      })
-    })
-  })
-
-  const allRows = Object.values(rowMap)
-  console.log('[Diag] total rows in rowMap:', allRows.length)
-  if (allRows.length > 0) {
-    console.log('[Diag] sample row[0] keys:', Object.keys(allRows[0]))
-    console.log('[Diag] sample row[0] data:', allRows[0])
-  }
-
-  let filtered = allRows.filter((row) => {
-    const sym = (row.symbol || '').toLowerCase()
-    return !SKIP_SYMBOLS.includes(sym) && Object.keys(row).length > 0
-  })
-  console.log('[Diag] after filter:', filtered.length, 'rows remain')
-
-  // if the ag-grid approach produced no results, try the newer flex-table format
-  if (filtered.length === 0) {
-    const flexRows = scrapeFlexTableTradeData(allDocs)
-    if (flexRows.length > 0) {
-      console.log('[Diag] flex table parser returned rows:', flexRows.length)
-      filtered = flexRows
-    }
-  }
-
-  return filtered
 }
 
 function normalizeHeader(text) {
@@ -267,150 +177,231 @@ function normalizeHeader(text) {
     .replace(/\s+/g, ' ')
 }
 
+function parseCellValue(cell) {
+  const raw = cell?.innerText || ''
+  return raw.split('\n').map((s) => s.trim()).filter(Boolean)[0] || ''
+}
+
 function mapHeaderToField(header) {
   const h = normalizeHeader(header)
   if (h.includes('symbol') || h.includes('ticker')) return 'symbol'
-  if (h.includes('market value') || h === 'value' || h.includes('current value')) return 'currentValue'
+  if (h.includes('market value') || h === 'value' || h.includes('current value') || h.includes('total value')) return 'currentValue'
   if (h.includes('% of') || h.includes('allocation') || h.includes('weight')) return 'pctOfAccount'
   if (h.includes('quantity') || h.includes('shares') || h === 'qty') return 'quantity'
   if (h.includes('cost basis') || h === 'cost') return 'costBasis'
   return null
 }
 
-function parseCellValue(cell) {
-  const raw = cell?.innerText || ''
-  return raw.split('\n').map((s) => s.trim()).filter(Boolean)[0] || ''
+function safeDecode(value) {
+  try {
+    return decodeURIComponent(value)
+  } catch (e) {
+    return value
+  }
 }
 
-function scrapeSofiTradeData() {
-  const allDocs = getAllDocuments()
-  const rowsOut = []
+function parseDataAttribute(attr) {
+  const out = {}
+  if (!attr) return out
+  attr.split(';').forEach((chunk) => {
+    const trimmed = chunk.trim()
+    if (!trimmed) return
+    const idx = trimmed.indexOf('=')
+    if (idx <= 0) return
+    const key = trimmed.slice(0, idx).trim()
+    const value = safeDecode(trimmed.slice(idx + 1).trim())
+    if (!key || !value) return
+    const canonical = FIELD_MAP[key] || key
+    out[canonical] = value
+  })
+  return out
+}
 
+function normalizeSymbol(value) {
+  return String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '')
+}
+
+function getCanonicalField(rawKey) {
+  const key = String(rawKey || '').trim()
+  for (const [canonical, aliases] of Object.entries(FIELD_ALIASES)) {
+    if (aliases.includes(key)) return canonical
+  }
+  return null
+}
+
+function normalizeHolding(raw) {
+  if (!raw || typeof raw !== 'object') return null
+  const row = {}
+  for (const [key, value] of Object.entries(raw)) {
+    if (value === undefined || value === null || value === '') continue
+    const canonical = getCanonicalField(key)
+    if (!canonical) continue
+    row[canonical] = String(value).trim()
+  }
+  row.symbol = normalizeSymbol(row.symbol)
+  if (!row.symbol || SKIP_SYMBOLS.has(row.symbol.toLowerCase())) return null
+  return row
+}
+
+function mergeRows(rows) {
+  const bySymbol = {}
+  rows.forEach((row) => {
+    const sym = row.symbol
+    if (!bySymbol[sym]) {
+      bySymbol[sym] = { ...row }
+      return
+    }
+    const existing = bySymbol[sym]
+    for (const key of Object.keys(FIELD_ALIASES)) {
+      if (!existing[key] && row[key]) existing[key] = row[key]
+    }
+  })
+  return Object.values(bySymbol)
+}
+
+function postProcessRows(rows) {
+  const normalized = rows.map(normalizeHolding).filter(Boolean)
+  return mergeRows(normalized)
+}
+
+function scrapeFidelityAgGrid(allDocs) {
+  const rowMap = {}
+  allDocs.forEach(({ doc }) => {
+    doc.querySelectorAll('.ag-row').forEach((row) => {
+      const idx = row.getAttribute('row-index')
+      if (idx === null) return
+      if (!rowMap[idx]) rowMap[idx] = {}
+      row.querySelectorAll('[col-id]').forEach((cell) => {
+        const colId = cell.getAttribute('col-id')
+        if (!colId) return
+        const value = parseCellValue(cell)
+        if (!value) return
+        rowMap[idx][colId] = value
+        const friendly = FIELD_MAP[colId]
+        if (friendly && !rowMap[idx][friendly]) rowMap[idx][friendly] = value
+      })
+    })
+  })
+  const rows = Object.values(rowMap)
+  console.log('[Diag] Fidelity ag-grid raw rows:', rows.length)
+  return rows
+}
+
+function scrapeFidelityFlexTable(allDocs) {
+  const out = []
+  allDocs.forEach(({ doc, label }) => {
+    const rows = doc.querySelectorAll('table[class^="FlexTable-"] tr[data-mjs-value]')
+    if (rows.length) console.log(`[Diag] ${label} flex rows:`, rows.length)
+    rows.forEach((tr) => {
+      out.push(parseDataAttribute(tr.getAttribute('data-mjs-value') || ''))
+    })
+  })
+  return out
+}
+
+function scrapeTableByHeaders(allDocs) {
+  const out = []
   allDocs.forEach(({ doc, label }) => {
     const tables = Array.from(doc.querySelectorAll('table'))
-    console.log(`[Diag][SoFi] "${label}" -> table count:`, tables.length)
+    if (tables.length) console.log(`[Diag] ${label} table count:`, tables.length)
 
-        tables.forEach((table, tableIdx) => {
-        const headers = Array.from(table.querySelectorAll('thead th, tr th'))
-          .map((th) => parseCellValue(th))
-        if (headers.length === 0) return
+    tables.forEach((table) => {
+      const headers = Array.from(table.querySelectorAll('thead th, tr th')).map((th) => parseCellValue(th))
+      if (headers.length === 0) return
+      const fieldByCol = headers.map(mapHeaderToField)
+      if (!fieldByCol.some(Boolean)) return
 
-        const fieldByCol = headers.map(mapHeaderToField)
-        if (!fieldByCol.some(Boolean)) return
-
-        const bodyRows = Array.from(table.querySelectorAll('tbody tr'))
-        if (bodyRows.length === 0) return
-
-        bodyRows.forEach((tr) => {
-          const cells = Array.from(tr.querySelectorAll('td'))
-          if (cells.length === 0) return
-          const row = {}
-
-          cells.forEach((td, i) => {
-            const field = fieldByCol[i]
-            if (!field) return
-            const value = parseCellValue(td)
-            if (value) row[field] = value
-          })
-
-          if (!row.symbol) return
-          const sym = row.symbol.toLowerCase()
-          if (SKIP_SYMBOLS.includes(sym)) return
-          rowsOut.push(row)
-        })
-
-        console.log(`[Diag][SoFi] table ${tableIdx} parsed rows:`, rowsOut.length)
-      })
-  })
-
-  console.log('[Diag][SoFi] total parsed rows:', rowsOut.length)
-
-  // if no rows were found using the <table> approach, look for generic
-  // 'data-mjs-value' elements – the new SoFi layout wraps each holding in a
-  // div carrying the symbol and values in that attribute.
-  if (rowsOut.length === 0) {
-    const generic = []
-    allDocs.forEach(({ doc, label }) => {
-      // restrict to the row elements we saw in the DOM snippet
-      const elems = Array.from(doc.querySelectorAll('[data-mjs="summary-watchlist-item"][data-mjs-value]'))
-      if (elems.length) console.log(`[Diag][SoFi] "${label}" generic elems:`, elems.length)
-
-      elems.forEach((el) => {
-        const attr = el.getAttribute('data-mjs-value') || ''
-        if (!attr.startsWith('symbol=')) return
+      const bodyRows = Array.from(table.querySelectorAll('tbody tr'))
+      bodyRows.forEach((tr) => {
         const row = {}
-
-        // symbol is mandatory and appears in the attribute
-        const symMatch = attr.match(/symbol=([^;]+)/)
-        if (symMatch) row.symbol = symMatch[1]
-
-        // try to pick up quantity/values from aria-labels if present
-        const qtyEl = el.querySelector('[aria-label^="number of shares"]')
-        if (qtyEl) row.quantity = parseCellValue(qtyEl)
-        const valEl = el.querySelector('[aria-label^="Total Value"]')
-        if (valEl) row.currentValue = parseCellValue(valEl)
-
-        // fallback: look for any $ value in text nodes
-        if (!row.currentValue) {
-          const txt = el.innerText || ''
-          const m = txt.match(/\$[\d,\.]+/)  // first dollar amount
-          if (m) row.currentValue = m[0]
-        }
-
-        if (row.symbol && !SKIP_SYMBOLS.includes(row.symbol.toLowerCase())) {
-          generic.push(row)
-        }
+        const cells = Array.from(tr.querySelectorAll('td'))
+        cells.forEach((td, i) => {
+          const field = fieldByCol[i]
+          if (!field) return
+          const value = parseCellValue(td)
+          if (value) row[field] = value
+        })
+        if (Object.keys(row).length > 0) out.push(row)
       })
     })
-    console.log('[Diag][SoFi] generic parsed rows:', generic.length)
-    if (generic.length > 0) rowsOut.push(...generic)
-  }
-
-  return rowsOut
+  })
+  return out
 }
 
-
-// helper used by the new "flextable" parser (Fidelity's other UI variant)
-function scrapeFlexTableTradeData(allDocs) {
+function scrapeSofiCards(allDocs) {
   const out = []
-
   allDocs.forEach(({ doc, label }) => {
-    // table class can change but typically starts with "FlexTable-"; we also
-    // match any <tr> that has a data-mjs-value attribute.
-    const selector = 'table[class^="FlexTable-"] tr[data-mjs-value]'
-    const rows = doc.querySelectorAll(selector)
-    if (rows.length) console.log(`[Diag] "${label}" → flex rows:`, rows.length)
-
-    rows.forEach((tr) => {
-      const dataAttr = tr.getAttribute('data-mjs-value')
-      if (!dataAttr) return
-
-      // parse semi-colon separated key=val pairs
-      const pairs = dataAttr.split(";").map(p => p.split("=")).filter(p => p.length === 2)
-      const row = {}
-      pairs.forEach(([k, v]) => {
-        // copy only the fields we care about; keep raw strings for now
-        if (k === 'symbol') row.symbol = v
-        if (k === 'currentValue') row.currentValue = v
-        if (k === 'pctOfAccount') row.pctOfAccount = v
-        if (k === 'quantity') row.quantity = v
-        if (k === 'costBasis') row.costBasis = v
-      })
-
-      if (row.symbol && !SKIP_SYMBOLS.includes(row.symbol.toLowerCase())) {
-        out.push(row)
+    const items = Array.from(doc.querySelectorAll('[data-mjs-value]'))
+    if (items.length) console.log(`[Diag] ${label} data-mjs-value elems:`, items.length)
+    items.forEach((el) => {
+      const parsed = parseDataAttribute(el.getAttribute('data-mjs-value') || '')
+      if (!parsed.symbol) {
+        const symMatch = (el.getAttribute('data-mjs-value') || '').match(/symbol=([^;]+)/)
+        if (symMatch) parsed.symbol = safeDecode(symMatch[1])
       }
+      if (!parsed.quantity) {
+        const qtyEl = el.querySelector('[aria-label^="number of shares"]')
+        if (qtyEl) parsed.quantity = parseCellValue(qtyEl)
+      }
+      if (!parsed.currentValue) {
+        const valEl = el.querySelector('[aria-label^="Total Value"]')
+        if (valEl) parsed.currentValue = parseCellValue(valEl)
+      }
+      if (!parsed.currentValue) {
+        const txt = el.innerText || ''
+        const m = txt.match(/\$[\d,]+(?:\.\d+)?/)
+        if (m) parsed.currentValue = m[0]
+      }
+      if (Object.keys(parsed).length > 0) out.push(parsed)
     })
   })
-
   return out
+}
+
+const SCRAPER_PIPELINE = {
+  fidelity: [scrapeFidelityAgGrid, scrapeFidelityFlexTable, scrapeTableByHeaders, scrapeSofiCards],
+  sofi: [scrapeTableByHeaders, scrapeSofiCards, scrapeFidelityAgGrid, scrapeFidelityFlexTable],
+  unknown: [scrapeFidelityAgGrid, scrapeFidelityFlexTable, scrapeTableByHeaders, scrapeSofiCards],
+}
+
+function scrapeTradeData() {
+  const broker = detectBroker()
+  const allDocs = getAllDocuments()
+  const pipeline = SCRAPER_PIPELINE[broker] || SCRAPER_PIPELINE.unknown
+
+  console.log('[Diag] detected broker:', broker)
+  console.log('[Diag] accessible docs:', allDocs.map((d) => d.label))
+
+  for (const scraper of pipeline) {
+    const rawRows = scraper(allDocs)
+    const rows = postProcessRows(rawRows)
+    if (rows.length > 0) {
+      console.log(`[Diag] parser ${scraper.name} returned`, rows.length, 'normalized rows')
+      return rows
+    }
+  }
+
+  return []
 }
 
 async function scrapeWithRetry(retries = 5, delay = 700) {
   for (let i = 0; i < retries; i++) {
     const data = scrapeTradeData()
     if (data.length > 0) return data
-    await new Promise(r => setTimeout(r, delay))
+    await new Promise((r) => setTimeout(r, delay))
   }
   return []
+}
+
+window._hackalytics = {
+  detectBroker,
+  scrapeTradeData,
+  scrapeWithRetry,
+  scrapeFidelityAgGrid,
+  scrapeFidelityFlexTable,
+  scrapeTableByHeaders,
+  scrapeSofiCards,
 }

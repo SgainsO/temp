@@ -152,7 +152,6 @@ def optimize_from_holdings(req: OptimizeFromHoldingsRequest):
     result["current_weights"] = {t: round(v / valid_total, 6) for t, v in valid_values.items()}
     return result
 
-
 # ── Dev entry point ───────────────────────────────────────────────────────────
 
 if __name__ == "__main__":

@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-
 const API = 'http://localhost:8787'
+const SUPPORTED_BROKER_DOMAINS = ['fidelity.com', 'sofi.com']
 
 const RATING_CLS = {
   'Well Diversified': 'green',
@@ -30,12 +29,94 @@ function hhiCls(v)  { return v > 2500 ? 'red' : v > 1500 ? 'amber' : 'green' }
 function topCls(v)  { return v > 40   ? 'red' : v > 25   ? 'amber' : 'green' }
 function retCls(v)  { return v >= 0 ? 'green' : 'red' }
 
+function isSupportedBrokerUrl(url) {
+  return SUPPORTED_BROKER_DOMAINS.some((domain) => url.includes(domain))
+}
 
-// ── Main App ──────────────────────────────────────────────────────────────────
+function WeightChart({ optResult }) {
+  const { tickers, weights: opt, current_weights: cur, sharpe, annual_return, annual_vol } = optResult
+
+  const allWeights = tickers.flatMap((t) => [opt[t] ?? 0, cur[t] ?? 0])
+  const maxW = Math.max(...allWeights, 0.01)
+
+  const pct = (w) => ((w ?? 0) * 100).toFixed(1)
+  const barW = (w) => `${((w ?? 0) / maxW) * 100}%`
+
+  return (
+    <>
+      <div className="opt-stats">
+        <div className="opt-stat-card">
+          <div className="opt-stat-label">Sharpe</div>
+          <div className={`opt-stat-num ${sharpe >= 1 ? 'green' : sharpe >= 0 ? 'cyan' : 'red'}`}>
+            {sharpe.toFixed(2)}
+          </div>
+        </div>
+        <div className="opt-stat-card">
+          <div className="opt-stat-label">Ann. Return</div>
+          <div className={`opt-stat-num ${retCls(annual_return)}`}>
+            {(annual_return * 100).toFixed(1)}%
+          </div>
+        </div>
+        <div className="opt-stat-card">
+          <div className="opt-stat-label">Ann. Vol</div>
+          <div className="opt-stat-num">{(annual_vol * 100).toFixed(1)}%</div>
+        </div>
+      </div>
+
+      <div className="wt-chart">
+        <div className="wt-chart-header">
+          <span className="wt-chart-title">Recommended Weights</span>
+          <div className="wt-legend">
+            <span className="wt-legend-item">
+              <span className="wt-legend-dot cur" /> NOW
+            </span>
+            <span className="wt-legend-item">
+              <span className="wt-legend-dot opt" /> OPT
+            </span>
+          </div>
+        </div>
+
+        {tickers.map((ticker, i) => {
+          const curW = cur[ticker] ?? 0
+          const optW = opt[ticker] ?? 0
+          const delta = (optW - curW) * 100
+          const absDelta = Math.abs(delta)
+          const deltaCls = absDelta < 0.05 ? 'flat' : delta > 0 ? 'up' : 'down'
+          const deltaStr = absDelta < 0.05 ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(1)}%`
+
+          return (
+            <div key={ticker} className="wt-row" style={{ animationDelay: `${i * 0.04}s` }}>
+              <div className="wt-ticker-label">{ticker}</div>
+              <div className="wt-bar-group">
+                <div className="wt-bar-row">
+                  <span className="wt-bar-type">NOW</span>
+                  <div className="wt-track">
+                    <div className="wt-fill cur" style={{ '--bar-w': barW(curW) }} />
+                  </div>
+                  <span className="wt-pct cur">{pct(curW)}%</span>
+                  <span className="wt-delta flat" />
+                </div>
+
+                <div className="wt-bar-row">
+                  <span className="wt-bar-type">OPT</span>
+                  <div className="wt-track">
+                    <div className="wt-fill opt" style={{ '--bar-w': barW(optW) }} />
+                  </div>
+                  <span className="wt-pct opt">{pct(optW)}%</span>
+                  <span className={`wt-delta ${deltaCls}`}>{deltaStr}</span>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </>
+  )
+}
 
 function App() {
-  const [tab,      setTab]      = useState('diversity')
-  const [holdings, setHoldings] = useState([])
+  const [tab,       setTab]       = useState('diversity')
+  const [holdings,  setHoldings]  = useState([])
 
   const [divResult,  setDivResult]  = useState(null)
   const [divLoading, setDivLoading] = useState(false)
@@ -47,24 +128,21 @@ function App() {
 
   const isLive = divResult !== null || optResult !== null
 
-  // auto-scrape the moment the popup opens
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { handleScrape() }, [])
 
-  // auto-run diversity whenever holdings change
   useEffect(() => {
     if (holdings.length > 0) runDiversity(holdings)
     else setDivResult(null)
   }, [holdings])
 
-  // ── Scrape ───────────────────────────────────────────────────────────────
   const handleScrape = async () => {
     setDivLoading(true)
     setDivError(null)
     try {
       const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true })
       const url = activeTab.url || ''
-      if (!url.includes('fidelity.com') && !url.includes('sofi.com')) {
+      if (!isSupportedBrokerUrl(url)) {
         throw new Error('Navigate to a Fidelity or SoFi positions page first.')
       }
       chrome.tabs.sendMessage(activeTab.id, { type: 'SCRAPE_TRADES' }, (response) => {
@@ -86,7 +164,6 @@ function App() {
     }
   }
 
-  // ── Diversity API ─────────────────────────────────────────────────────────
   const runDiversity = async (data) => {
     setDivLoading(true)
     try {
@@ -104,7 +181,6 @@ function App() {
     }
   }
 
-  // ── Optimize API ──────────────────────────────────────────────────────────
   const handleOptimize = async () => {
     if (holdings.length === 0) {
       setOptError('Scrape positions first on the Diversity tab.')
@@ -119,7 +195,7 @@ function App() {
         body:    JSON.stringify({ data: holdings }),
       })
       if (!resp.ok) {
-        const detail = await resp.json().then(j => j.detail).catch(() => resp.status)
+        const detail = await resp.json().then((j) => j.detail).catch(() => resp.status)
         throw new Error(detail)
       }
       setOptResult(await resp.json())
@@ -132,12 +208,9 @@ function App() {
 
   const ratingCls = divResult ? (RATING_CLS[divResult.metrics.rating] ?? 'gray') : null
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="terminal">
       <div className="term-inner">
-
-        {/* Header */}
         <div className="hdr">
           <div>
             <div className="brand-name">⬡ Hackalytics</div>
@@ -149,7 +222,6 @@ function App() {
           </div>
         </div>
 
-        {/* Ticker strip */}
         <div className="ticker-strip">
           {TICKERS.map(({ sym, val, up }) => (
             <span key={sym} className="tick">
@@ -158,21 +230,21 @@ function App() {
           ))}
         </div>
 
-        {/* Tabs */}
         <div className="tabs">
-          <button className={`tab-btn ${tab === 'diversity' ? 'active' : ''}`}
-                  onClick={() => setTab('diversity')}>
+          <button className={`tab-btn ${tab === 'diversity' ? 'active' : ''}`} onClick={() => setTab('diversity')}>
             ◈ Diversity
+          </button>
+          <button className={`tab-btn ${tab === 'optimize' ? 'active' : ''}`} onClick={() => setTab('optimize')}>
+            ◉ Optimize
           </button>
         </div>
 
-        {/* ══ DIVERSITY TAB ══════════════════════════════════════════════ */}
         {tab === 'diversity' && (
           <>
-            <button className="scan-btn" onClick={handleScrape && handleOptimize} disabled={divLoading}>
+            <button className="scan-btn" onClick={handleScrape} disabled={divLoading}>
               {divLoading
                 ? <>SCANNING<span className="dot">.</span><span className="dot">.</span><span className="dot">.</span></>
-                : '↺  RE-SCAN POSITIONS'}
+                : '↻  RE-SCAN POSITIONS'}
             </button>
 
             {divLoading && (
@@ -244,8 +316,10 @@ function App() {
                       <span className="sector-pct">{item.weight_pct}%</span>
                     </div>
                     <div className="bar-track">
-                      <div className="bar-fill"
-                           style={{ '--bar-w': `${item.weight_pct}%`, background: sectorColor(item.weight_pct) }} />
+                      <div
+                        className="bar-fill"
+                        style={{ '--bar-w': `${item.weight_pct}%`, background: sectorColor(item.weight_pct) }}
+                      />
                     </div>
                   </div>
                 ))}
@@ -269,14 +343,45 @@ function App() {
           </>
         )}
 
+        {tab === 'optimize' && (
+          <>
+            <button className="opt-btn" onClick={handleOptimize} disabled={optLoading}>
+              {optLoading
+                ? <>OPTIMIZING<span className="dot">.</span><span className="dot">.</span><span className="dot">.</span></>
+                : '◉  RUN OPTIMIZER'}
+            </button>
 
+            {optLoading && (
+              <div className="loading-row">
+                <div className="spinner cyan" />
+                <span className="loading-label cyan">Running Sharpe optimization</span>
+              </div>
+            )}
 
-        {/* Footer */}
+            {optError && <div className="error-bar">{optError}</div>}
+            {optResult && <WeightChart optResult={optResult} />}
+
+            {!optResult && !optLoading && !optError && (
+              <div className="empty">
+                <div className="empty-bars">
+                  {[14, 32, 20, 28, 10, 24, 18].map((h, i) => (
+                    <div key={i} className="empty-bar" style={{ height: `${h}px`, animationDelay: `${i * 0.12}s` }} />
+                  ))}
+                </div>
+                <div className="empty-label">
+                  {holdings.length > 0
+                    ? <>Ready — click RUN OPTIMIZER<span className="cursor" /></>
+                    : <>Scrape positions first on the<br />Diversity tab<span className="cursor" /></>}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
         <div className="footer">
           <span>Hackalytics v0.1</span>
           <span>◉ localhost:8787</span>
         </div>
-
       </div>
     </div>
   )
