@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-
+from compute_volatility import analyze_tickers_volatility
 from diversity import calc_entropy, calc_hhi, calc_industry_totals, clean_holdings, rating_from_hhi
 from optimize import optimize_sharpe
 
@@ -150,6 +150,9 @@ def optimize_from_holdings(req: OptimizeFromHoldingsRequest):
     result["current_weights"] = current_weights
     return result
 
+@app.post("/api/volatality_anal")
+def volatility_stocks(req: OptimizeRequest):
+    return(analyze_tickers_volatility(req.tickers, req.period))
 
 # ── Dev entry point ───────────────────────────────────────────────────────────
 
