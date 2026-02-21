@@ -11,7 +11,7 @@ const RATING_CLS = {
   'Concentrated':     'red',
 }
 
-const MARQUEE = [
+const TICKERS = [
   { sym: 'SPY', val: '+0.42%', up: true  },
   { sym: 'QQQ', val: '+0.89%', up: true  },
   { sym: 'VTI', val: '+0.31%', up: true  },
@@ -26,27 +26,35 @@ function sectorColor(pct) {
   return 'linear-gradient(90deg,#00ff88,#00d4ff)'
 }
 
-function hhiCls(v) { return v > 2500 ? 'red' : v > 1500 ? 'amber' : 'green' }
-function topCls(v) { return v > 40   ? 'red' : v > 25   ? 'amber' : 'green' }
+function hhiCls(v)  { return v > 2500 ? 'red' : v > 1500 ? 'amber' : 'green' }
+function topCls(v)  { return v > 40   ? 'red' : v > 25   ? 'amber' : 'green' }
+function retCls(v)  { return v >= 0 ? 'green' : 'red' }
+
 
 // ── Main App ──────────────────────────────────────────────────────────────────
 
 function App() {
+  const [tab,      setTab]      = useState('diversity')
   const [holdings, setHoldings] = useState([])
 
   const [divResult,  setDivResult]  = useState(null)
   const [divLoading, setDivLoading] = useState(false)
   const [divError,   setDivError]   = useState(null)
 
-  const isLive = divResult !== null
+  const [optResult,  setOptResult]  = useState(null)
+  const [optLoading, setOptLoading] = useState(false)
+  const [optError,   setOptError]   = useState(null)
 
-  // auto-scrape on popup open
+  const isLive = divResult !== null || optResult !== null
+
+  // auto-scrape the moment the popup opens
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { handleScrape() }, [])
 
+  // auto-run diversity whenever holdings change
   useEffect(() => {
-    if (holdings.length === 0) { setDivResult(null); return }
-    runDiversity(holdings)
+    if (holdings.length > 0) runDiversity(holdings)
+    else setDivResult(null)
   }, [holdings])
 
   // ── Scrape ───────────────────────────────────────────────────────────────
@@ -55,12 +63,13 @@ function App() {
     setDivError(null)
     try {
       const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true })
-      if (!activeTab.url.includes('fidelity.com')) {
-        throw new Error('Navigate to a Fidelity positions page first.')
+      const url = activeTab.url || ''
+      if (!url.includes('fidelity.com') && !url.includes('sofi.com')) {
+        throw new Error('Navigate to a Fidelity or SoFi positions page first.')
       }
       chrome.tabs.sendMessage(activeTab.id, { type: 'SCRAPE_TRADES' }, (response) => {
         if (chrome.runtime.lastError) {
-          setDivError('Content script not ready — refresh the Fidelity page.')
+          setDivError('Content script not ready — refresh the Fidelity/SoFi page.')
           setDivLoading(false)
           return
         }
@@ -77,13 +86,14 @@ function App() {
     }
   }
 
-  // ── Diversity ─────────────────────────────────────────────────────────────
+  // ── Diversity API ─────────────────────────────────────────────────────────
   const runDiversity = async (data) => {
     setDivLoading(true)
     try {
       const resp = await fetch(`${API}/api/diversity`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ holdings: data }),
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ holdings: data }),
       })
       if (!resp.ok) throw new Error(`Server ${resp.status}`)
       setDivResult(await resp.json())
@@ -91,6 +101,32 @@ function App() {
       setDivError('Backend unreachable — run: python main.py')
     } finally {
       setDivLoading(false)
+    }
+  }
+
+  // ── Optimize API ──────────────────────────────────────────────────────────
+  const handleOptimize = async () => {
+    if (holdings.length === 0) {
+      setOptError('Scrape positions first on the Diversity tab.')
+      return
+    }
+    setOptLoading(true)
+    setOptError(null)
+    try {
+      const resp = await fetch(`${API}/api/optimize-from-holdings`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ data: holdings }),
+      })
+      if (!resp.ok) {
+        const detail = await resp.json().then(j => j.detail).catch(() => resp.status)
+        throw new Error(detail)
+      }
+      setOptResult(await resp.json())
+    } catch (err) {
+      setOptError(String(err.message ?? err))
+    } finally {
+      setOptLoading(false)
     }
   }
 
@@ -104,8 +140,8 @@ function App() {
         {/* Header */}
         <div className="hdr">
           <div>
-            <div className="brand-name">⬡ Hackalytics v2</div>
-            <div className="brand-sub">Fidelity Position Analyzer</div>
+            <div className="brand-name">⬡ Hackalytics</div>
+            <div className="brand-sub">Fidelity + SoFi Position Analyzer</div>
           </div>
           <div className={`hdr-status ${isLive ? 'live' : ''}`}>
             <div className={`status-dot ${isLive ? 'live' : ''}`} />
@@ -115,17 +151,25 @@ function App() {
 
         {/* Ticker strip */}
         <div className="ticker-strip">
-          {MARQUEE.map(({ sym, val, up }) => (
+          {TICKERS.map(({ sym, val, up }) => (
             <span key={sym} className="tick">
               {sym} <span className={up ? 'up' : 'down'}>{val}</span>
             </span>
           ))}
         </div>
 
-        {/* ══ CONTENT ════════════════════════════════════════════════════ */}
-        <>
+        {/* Tabs */}
+        <div className="tabs">
+          <button className={`tab-btn ${tab === 'diversity' ? 'active' : ''}`}
+                  onClick={() => setTab('diversity')}>
+            ◈ Diversity
+          </button>
+        </div>
+
+        {/* ══ DIVERSITY TAB ══════════════════════════════════════════════ */}
+        {tab === 'diversity' && (
           <>
-            <button className="scan-btn" onClick={handleScrape} disabled={divLoading}>
+            <button className="scan-btn" onClick={handleScrape && handleOptimize} disabled={divLoading}>
               {divLoading
                 ? <>SCANNING<span className="dot">.</span><span className="dot">.</span><span className="dot">.</span></>
                 : '↺  RE-SCAN POSITIONS'}
@@ -140,7 +184,6 @@ function App() {
 
             {divError && <div className="error-bar">{divError}</div>}
 
-            {/* Rating */}
             {divResult && (
               <div className={`rating-card ${ratingCls}`}>
                 <div className="rating-eyebrow">Diversification Rating</div>
@@ -148,17 +191,22 @@ function App() {
                 <div className="rating-divider" />
                 <div className="portfolio-value">
                   Portfolio Value&nbsp;&nbsp;
-                  <span>${divResult.total_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span>
+                    ${divResult.total_value.toLocaleString(undefined, {
+                      minimumFractionDigits: 2, maximumFractionDigits: 2,
+                    })}
+                  </span>
                 </div>
               </div>
             )}
 
-            {/* Metrics */}
             {divResult && (
               <div className="metrics-grid">
                 <div className="metric-card">
                   <div className="metric-label">HHI Score</div>
-                  <div className={`metric-num ${hhiCls(divResult.metrics.hhi)}`}>{divResult.metrics.hhi.toLocaleString()}</div>
+                  <div className={`metric-num ${hhiCls(divResult.metrics.hhi)}`}>
+                    {divResult.metrics.hhi.toLocaleString()}
+                  </div>
                   <div className="metric-sub">Concentration index</div>
                 </div>
                 <div className="metric-card">
@@ -168,7 +216,9 @@ function App() {
                 </div>
                 <div className="metric-card">
                   <div className="metric-label">Top Weight</div>
-                  <div className={`metric-num ${topCls(divResult.metrics.top_industry_weight_pct)}`}>{divResult.metrics.top_industry_weight_pct}%</div>
+                  <div className={`metric-num ${topCls(divResult.metrics.top_industry_weight_pct)}`}>
+                    {divResult.metrics.top_industry_weight_pct}%
+                  </div>
                   <div className="metric-sub">Largest sector</div>
                 </div>
                 <div className="metric-card">
@@ -179,7 +229,6 @@ function App() {
               </div>
             )}
 
-            {/* Sector breakdown */}
             {divResult?.industry_breakdown?.length > 0 && (
               <div className="sectors">
                 <div className="sec-header">
@@ -195,7 +244,8 @@ function App() {
                       <span className="sector-pct">{item.weight_pct}%</span>
                     </div>
                     <div className="bar-track">
-                      <div className="bar-fill" style={{ '--bar-w': `${item.weight_pct}%`, background: sectorColor(item.weight_pct) }} />
+                      <div className="bar-fill"
+                           style={{ '--bar-w': `${item.weight_pct}%`, background: sectorColor(item.weight_pct) }} />
                     </div>
                   </div>
                 ))}
@@ -211,13 +261,15 @@ function App() {
                 </div>
                 <div className="empty-label">
                   Awaiting position data<br />
-                  Open Fidelity → Positions tab
+                  Open Fidelity/SoFi → Positions tab
                   <span className="cursor" />
                 </div>
               </div>
             )}
           </>
-        </>
+        )}
+
+
 
         {/* Footer */}
         <div className="footer">

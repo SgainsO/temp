@@ -1,16 +1,43 @@
 import math
+import re
+from typing import Any
 
 
 def clean_holdings(raw_holdings: list) -> list:
+    """Normalize incoming holdings into a list of {industry, value} dicts.
+
+    The front‑end scraper sends whatever cells it can find which vary by broker;
+    some use "value", others "currentValue"/"curVal" and so on.  Interpret any
+    of those fields as the numeric value and strip out dollars/commas.  If no
+    numeric field is present or the parsed amount is non‑finite we skip the row.
+    """
+
+    def _parse_num(v: Any) -> float:
+        # accept ints/floats directly
+        if isinstance(v, (int, float)):
+            return float(v)
+        s = str(v)
+        # remove currency symbols, commas, spaces, etc.
+        s = re.sub(r"[^0-9.\-]", "", s)
+        try:
+            return float(s)
+        except ValueError:
+            return 0.0
+
     if not isinstance(raw_holdings, list):
         return []
-    result = []
+    result: list[dict[str, Any]] = []
     for h in raw_holdings:
         industry = str(h.get("industry", "") or "").strip() or "Unknown"
-        try:
-            value = float(h.get("value", 0))
-        except (TypeError, ValueError):
+        # look for any supported value key
+        value_field: Any = None
+        for key in ("value", "currentValue", "curVal", "cur_val", "current_value"):
+            if key in h:
+                value_field = h.get(key)
+                break
+        if value_field is None:
             continue
+        value = _parse_num(value_field)
         if math.isfinite(value) and value >= 0:
             result.append({"industry": industry, "value": value})
     return result
