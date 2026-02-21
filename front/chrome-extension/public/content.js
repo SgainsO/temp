@@ -135,6 +135,44 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true
 })
 
+//-- --- --- --
+
+async function runOptimizer(holdingsData) {
+  try {
+    const resp = await fetch(`${API_BASE}/api/analyze_ticker_vol`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ data: holdingsData }),
+    })
+    if (!resp.ok) {
+      console.warn('[Hackalytics] anal returned', resp.status)
+      return
+    }
+    const result = await resp.json()
+    const annualized_volatility    = result.annualized_volatility
+    const spike_tickers = result.spike_tickers
+    const portfolio_risk_alert = result.portfolio_risk_alert
+
+    if (!annualized_volatility || !spike_tickers) return
+
+    const allocations = {}
+    for (const sym of result.tickers) {
+      allocations[sym.toUpperCase()] = {
+        annualized_volatility: (annualized_volatility[sym]),
+        spike_tickers: (spike_tickers[sym]),
+        portfolio_risk_alert: (portfolio_risk_alert[sym])
+      }
+    }
+
+    console.log('[Hackalytics] allocations:', allocations)
+    showAllocationPanel(allocations)
+  } catch (err) {
+    console.error('[Hackalytics] Optimizer call failed:', err)
+  }
+}
+
+
+
 // ── Scraping helpers ─────────────────────────────────────────────────────────
 
 const FIELD_MAP = {
