@@ -314,7 +314,7 @@ const FIELD_MAP = {
   cstBasTot: 'costBasis',
 }
 
-const SKIP_SYMBOLS = ['pending activity', 'account total', 'grand total']
+const SKIP_SYMBOLS = ['pending activity', 'account total', 'grand total', 'account:']
 const BROKER_HINTS = {
   fidelity: ['fidelity.com'],
   sofi: ['sofi.com'],

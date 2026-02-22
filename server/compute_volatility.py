@@ -6,7 +6,8 @@ def get_close_prices(tickers: list[str], period: str = "1y"):
     data = yf.download(tickers, period=period, auto_adjust=True, progress=False)["Close"]
     if len(tickers) == 1:
         data = data.to_frame(name=tickers[0])
-    return data[tickers]
+    available = [t for t in tickers if t in data.columns]
+    return data[available]
 
 
 def compute_volatility_signals(close_prices) -> dict:
