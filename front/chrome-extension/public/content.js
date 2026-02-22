@@ -421,7 +421,7 @@ function showVolatilityPanel(volData) {
 
 function showClusterPanel() {
   const existing = document.getElementById('hka-cluster-panel')
-  if (existing) existing.remove()
+  if (existing) return  // already visible — don't reset its dragged position
 
   const panel = document.createElement('div')
   panel.id = 'hka-cluster-panel'
