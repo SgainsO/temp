@@ -284,6 +284,30 @@ function WeightChart({ optResult, period }) {
 function App() {
   const [tab,      setTab]      = useState('diversity')
   const [holdings, setHoldings] = useState([])
+  const [zoom, setZoom] = useState(() => Number(localStorage.getItem('safeplay-zoom')) || 1)
+
+  const changeZoom = (delta) => {
+    setZoom(prev => {
+      const next = Math.round(Math.min(1.5, Math.max(0.7, prev + delta)) * 10) / 10
+      localStorage.setItem('safeplay-zoom', next)
+      return next
+    })
+  }
+
+  useEffect(() => {
+    document.body.style.zoom = zoom
+  }, [zoom])
+
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = document.activeElement?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (e.key === '+') changeZoom(0.1)
+      else if (e.key === '-') changeZoom(-0.1)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
 
   const [divResult,      setDivResult]      = useState(null)
   const [divLoading,     setDivLoading]     = useState(false)
@@ -538,9 +562,16 @@ function App() {
             <div className="brand-name">⬡ Safeplay</div>
             <div className="brand-sub">Saftey Position Analyzer</div>
           </div>
-          <div className={`hdr-status ${isLive ? 'live' : ''}`}>
-            <div className={`status-dot ${isLive ? 'live' : ''}`} />
-            {isLive ? 'LIVE' : 'IDLE'}
+          <div className="hdr-right">
+            <div className="zoom-controls">
+              <button className="zoom-btn" onClick={() => changeZoom(-0.1)}>−</button>
+              <span className="zoom-label">{Math.round(zoom * 100)}%</span>
+              <button className="zoom-btn" onClick={() => changeZoom(0.1)}>+</button>
+            </div>
+            <div className={`hdr-status ${isLive ? 'live' : ''}`}>
+              <div className={`status-dot ${isLive ? 'live' : ''}`} />
+              {isLive ? 'LIVE' : 'IDLE'}
+            </div>
           </div>
         </div>
 

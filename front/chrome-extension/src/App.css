@@ -1214,6 +1214,50 @@
   text-align: left;
 }
 
+/* ── Zoom Controls ─────────────────────────────────────────────────────── */
+.hdr-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.zoom-btn {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+  font-family: ui-monospace, 'Cascadia Code', 'Courier New', monospace;
+  font-weight: 700;
+  color: #5a7a9a;
+  background: #162035;
+  border: 1px solid #1e3050;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, border-color 0.15s;
+}
+.zoom-btn:hover {
+  color: #00d4ff;
+  border-color: rgba(0,212,255,0.4);
+}
+.zoom-label {
+  font-family: ui-monospace, 'Cascadia Code', 'Courier New', monospace;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  color: #5a7a9a;
+  min-width: 26px;
+  text-align: center;
+}
+
 /* ── Footer ────────────────────────────────────────────────────────────── */
 .footer {
   display: flex;
