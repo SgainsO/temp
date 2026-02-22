@@ -1,5 +1,80 @@
 const API_BASE = 'http://localhost:8787'
 
+// ── Drag helper ───────────────────────────────────────────────────────────────
+
+function makeDraggable(panel, handle) {
+  handle.style.cursor = 'grab'
+  handle.addEventListener('mousedown', e => {
+    e.preventDefault()
+    const rect = panel.getBoundingClientRect()
+    // Switch from bottom/right anchoring to top/left so we can move freely
+    panel.style.bottom = ''
+    panel.style.right  = ''
+    panel.style.left   = rect.left + 'px'
+    panel.style.top    = rect.top  + 'px'
+    const offsetX = e.clientX - rect.left
+    const offsetY = e.clientY - rect.top
+    handle.style.cursor = 'grabbing'
+    const onMove = e => {
+      panel.style.left = (e.clientX - offsetX) + 'px'
+      panel.style.top  = (e.clientY - offsetY) + 'px'
+    }
+    const onUp = () => {
+      handle.style.cursor = 'grab'
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup',   onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup',   onUp)
+  })
+}
+
+// ── Tooltip helper ────────────────────────────────────────────────────────────
+
+let _tipEl = null
+function getTip() {
+  if (!_tipEl) {
+    _tipEl = document.createElement('div')
+    _tipEl.style.cssText = [
+      'position:fixed',
+      'z-index:9999999',
+      'background:#0c1524',
+      'border:1px solid #2a4a70',
+      'border-radius:6px',
+      'padding:9px 11px',
+      'font-size:10px',
+      'color:#c9d8ed',
+      'line-height:1.55',
+      'max-width:220px',
+      'box-shadow:0 6px 24px rgba(0,0,0,0.6)',
+      'pointer-events:none',
+      'display:none',
+      'white-space:normal',
+      'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif',
+      'font-weight:400',
+      'letter-spacing:0',
+    ].join(';')
+    document.body.appendChild(_tipEl)
+  }
+  return _tipEl
+}
+
+function addTip(el, text) {
+  el.style.cursor = 'help'
+  el.addEventListener('mouseenter', () => {
+    const tip = getTip()
+    tip.textContent = text
+    tip.style.display = 'block'
+    const r   = el.getBoundingClientRect()
+    const tipW = 224
+    const tipH = tip.offsetHeight
+    const top  = r.top - tipH - 8
+    tip.style.left = Math.max(4, Math.min(r.left + r.width / 2 - tipW / 2, window.innerWidth - tipW - 4)) + 'px'
+    tip.style.top  = (top < 4 ? r.bottom + 8 : top) + 'px'
+  })
+  el.addEventListener('mouseleave', () => getTip().style.display = 'none')
+}
+
 // ── Floating delta panel ─────────────────────────────────────────────────────
 
 function showAllocationPanel(allocations) {
@@ -25,18 +100,31 @@ function showAllocationPanel(allocations) {
     'color:#c9d8ed',
     'box-shadow:0 4px 24px rgba(0,0,0,0.5)',
     'min-width:220px',
-    'max-height:400px',
-    'overflow-y:auto',
+    'min-height:80px',
+    'overflow:auto',
+    'resize:both',
   ].join(';')
 
   const title = document.createElement('div')
-  title.style.cssText = 'font-size:10px;letter-spacing:0.12em;color:#2e6a9a;text-transform:uppercase;margin-bottom:8px;padding-right:16px;'
+  title.style.cssText = 'font-size:10px;letter-spacing:0.12em;color:#5aadde;text-transform:uppercase;margin-bottom:8px;padding-right:16px;'
   title.textContent = '⬡ Hackalytics — Recommended Allocation'
   panel.appendChild(title)
 
   const hdr = document.createElement('div')
-  hdr.style.cssText = 'display:grid;grid-template-columns:60px 1fr 1fr;gap:8px;font-size:9px;color:#2e4a6a;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px;padding-bottom:4px;border-bottom:1px solid #1e3050;'
-  hdr.innerHTML = '<span>Ticker</span><span style="text-align:right">Current</span><span style="text-align:right">Target</span>'
+  hdr.style.cssText = 'display:grid;grid-template-columns:60px 1fr 1fr;gap:8px;font-size:9px;color:#5a7a9a;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px;padding-bottom:4px;border-bottom:1px solid #1e3050;'
+  const hdrTicker = document.createElement('span')
+  hdrTicker.textContent = 'Ticker'
+  const hdrCurrent = document.createElement('span')
+  hdrCurrent.style.textAlign = 'right'
+  hdrCurrent.textContent = 'Current'
+  addTip(hdrCurrent, 'What percentage of your total portfolio is currently in this stock.')
+  const hdrTarget = document.createElement('span')
+  hdrTarget.style.textAlign = 'right'
+  hdrTarget.textContent = 'Target'
+  addTip(hdrTarget, 'The suggested percentage — calculated to balance risk and reward across your whole portfolio. Moving toward this number could improve your overall returns.')
+  hdr.appendChild(hdrTicker)
+  hdr.appendChild(hdrCurrent)
+  hdr.appendChild(hdrTarget)
   panel.appendChild(hdr)
 
   entries
@@ -50,7 +138,7 @@ function showAllocationPanel(allocations) {
       symEl.textContent = sym
 
       const curEl = document.createElement('span')
-      curEl.style.cssText = 'text-align:right;color:#4a6a88;'
+      curEl.style.cssText = 'text-align:right;color:#7a9abb;'
       curEl.textContent = `${curPct.toFixed(1)}%`
 
       const optEl = document.createElement('span')
@@ -65,11 +153,12 @@ function showAllocationPanel(allocations) {
 
   const close = document.createElement('button')
   close.textContent = '✕'
-  close.style.cssText = 'position:absolute;top:8px;right:10px;background:none;border:none;color:#2e4a6a;cursor:pointer;font-size:12px;padding:0;'
+  close.style.cssText = 'position:absolute;top:8px;right:10px;background:none;border:none;color:#8aaccc;cursor:pointer;font-size:12px;padding:0;'
   close.onclick = () => panel.remove()
   panel.appendChild(close)
 
   document.body.appendChild(panel)
+  makeDraggable(panel, title)
 }
 
 // ── Optimizer call ───────────────────────────────────────────────────────────
@@ -186,13 +275,14 @@ function showVolatilityPanel(volData) {
     'color:#c9d8ed',
     'box-shadow:0 4px 24px rgba(0,0,0,0.5)',
     'min-width:280px',
-    'max-height:420px',
-    'overflow-y:auto',
+    'min-height:80px',
+    'overflow:auto',
+    'resize:both',
   ].join(';')
 
   // Title
   const title = document.createElement('div')
-  title.style.cssText = 'font-size:10px;letter-spacing:0.12em;color:#2e6a9a;text-transform:uppercase;margin-bottom:8px;padding-right:16px;'
+  title.style.cssText = 'font-size:10px;letter-spacing:0.12em;color:#5aadde;text-transform:uppercase;margin-bottom:8px;padding-right:16px;'
   title.textContent = '⬡ Hackalytics — Risk Report'
   panel.appendChild(title)
 
@@ -209,8 +299,18 @@ function showVolatilityPanel(volData) {
 
   // Column header
   const hdr = document.createElement('div')
-  hdr.style.cssText = 'display:grid;grid-template-columns:48px 1fr auto;gap:8px;font-size:9px;color:#2e4a6a;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px;padding-bottom:4px;border-bottom:1px solid #1e3050;'
-  hdr.innerHTML = '<span>Ticker</span><span>Risk Level</span><span>Typical Monthly Swing</span>'
+  hdr.style.cssText = 'display:grid;grid-template-columns:48px 1fr auto;gap:8px;font-size:9px;color:#5a7a9a;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px;padding-bottom:4px;border-bottom:1px solid #1e3050;'
+  const hdrSym = document.createElement('span')
+  hdrSym.textContent = 'Ticker'
+  const hdrRisk = document.createElement('span')
+  hdrRisk.textContent = 'Risk Level'
+  addTip(hdrRisk, 'How much this stock\'s price has been jumping around lately. "Very High Risk" means it\'s moving far more than normal — like a rollercoaster vs. a gentle ride.')
+  const hdrSwing = document.createElement('span')
+  hdrSwing.textContent = 'Typical Monthly Swing'
+  addTip(hdrSwing, 'On average, how much this stock\'s price might move up or down in a single month. A 15% swing on $1,000 means it could shift by about $150.')
+  hdr.appendChild(hdrSym)
+  hdr.appendChild(hdrRisk)
+  hdr.appendChild(hdrSwing)
   panel.appendChild(hdr)
 
   // Per-ticker rows (accordion)
@@ -235,16 +335,25 @@ function showVolatilityPanel(volData) {
     symEl.style.cssText = 'font-weight:700;color:#8aaccc;'
     symEl.textContent = ticker
 
+    const riskTips = {
+      'Very High Risk': 'This stock has been moving far more than usual — it could jump up or crash down quickly. Only hold this if big swings don\'t bother you.',
+      'High Risk':      'This stock moves a lot. There\'s good upside potential, but it can also fall fast. Think about how much of your money is here.',
+      'Moderate Risk':  'About average volatility — some ups and downs, but nothing unusual for most growth stocks.',
+      'Low-Mod Risk':   'Calmer than most stocks. More stable, though still not immune to market shifts.',
+      'Low Risk':       'This stock has been steady and predictable. Fewer surprises — but potentially slower growth too.',
+    }
     const riskEl = document.createElement('span')
     riskEl.style.cssText = `font-weight:${isSpike ? '700' : '400'};color:${risk.color};`
     riskEl.textContent = risk.label + spikeTxt
+    addTip(riskEl, (riskTips[risk.label] || 'Risk level based on recent price movement.') + (isSpike ? ` It has also recently spiked ${spikeDir} — moving much more than its own recent history.` : ''))
 
     const swingEl = document.createElement('span')
     swingEl.style.cssText = `color:${risk.color};font-weight:700;white-space:nowrap;`
     swingEl.textContent = swingTxt
+    addTip(swingEl, `On average, this stock\'s price moves up or down by about ${swingTxt.replace('~', '')} — that\'s how much it might shift in any given month based on recent history.`)
 
     const chevron = document.createElement('span')
-    chevron.style.cssText = 'color:#3a6a8a;font-size:9px;align-self:center;display:inline-block;transition:transform 0.15s;'
+    chevron.style.cssText = 'color:#60a0c8;font-size:9px;align-self:center;display:inline-block;transition:transform 0.15s;'
     chevron.textContent = '▾'
 
     row.appendChild(symEl)
@@ -259,8 +368,9 @@ function showVolatilityPanel(volData) {
 
     if (spikeMonths.length > 0) {
       const label = document.createElement('div')
-      label.style.cssText = 'color:#2e6a9a;margin-bottom:3px;letter-spacing:0.05em;'
+      label.style.cssText = 'color:#5aadde;margin-bottom:3px;letter-spacing:0.05em;'
       label.textContent = 'Typical spike months (5yr avg):'
+      addTip(label, 'Based on 5 years of history, these are the months where this stock has tended to move the most — up or down. Months where most stocks moved together (like a market crash) are excluded, so these are patterns specific to this stock.')
       detail.appendChild(label)
 
       spikeMonths.forEach(sm => {
@@ -271,7 +381,7 @@ function showVolatilityPanel(volData) {
         detail.appendChild(item)
       })
     } else {
-      detail.style.color = '#3a5578'
+      detail.style.color = '#628aaa'
       detail.textContent = 'No consistent monthly spike pattern detected.'
     }
 
@@ -289,18 +399,19 @@ function showVolatilityPanel(volData) {
 
   // Footer
   const footer = document.createElement('div')
-  footer.style.cssText = 'margin-top:8px;padding-top:6px;border-top:1px solid #1e3050;font-size:9px;color:#3a5578;line-height:1.5;'
+  footer.style.cssText = 'margin-top:8px;padding-top:6px;border-top:1px solid #1e3050;font-size:9px;color:#628aaa;line-height:1.5;'
   footer.textContent = '"Monthly swing" = how much this stock might typically move up or down in a single month.'
   panel.appendChild(footer)
 
   // Close button
   const close = document.createElement('button')
   close.textContent = '✕'
-  close.style.cssText = 'position:absolute;top:8px;right:10px;background:none;border:none;color:#2e4a6a;cursor:pointer;font-size:12px;padding:0;'
+  close.style.cssText = 'position:absolute;top:8px;right:10px;background:none;border:none;color:#8aaccc;cursor:pointer;font-size:12px;padding:0;'
   close.onclick = () => panel.remove()
   panel.appendChild(close)
 
   document.body.appendChild(panel)
+  makeDraggable(panel, title)
 }
 
 // ── Volatility call ───────────────────────────────────────────────────────────
