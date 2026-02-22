@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from compute_volatility import analyze_tickers_volatility
 from diversity import calc_entropy, calc_hhi, calc_industry_totals, clean_holdings, rating_from_hhi
 from optimize import optimize_sharpe
+from test_stock import list_stock_choices, simulate_add_stock
 
 app = FastAPI()
 
@@ -43,6 +44,14 @@ class SaveHoldingsRequest(BaseModel):
 class OptimizeFromHoldingsRequest(BaseModel):
     data: list[Any]
     period: str = "2y"
+    risk_free: float = 0.0
+
+
+class SimulateAddRequest(BaseModel):
+    holdings: list[Any] = []
+    added_symbol: str
+    added_value: float
+    period: str = "1y"
     risk_free: float = 0.0
 
 
@@ -172,6 +181,27 @@ def optimize_from_holdings(req: OptimizeFromHoldingsRequest):
 @app.post("/api/volatality_anal")
 def volatility_stocks(req: OptimizeRequest):
     return(analyze_tickers_volatility(req.tickers, req.period))
+
+
+@app.get("/api/stocks")
+def stocks(search: str | None = None, sector: str | None = None, limit: int = 200):
+    return list_stock_choices(search=search, sector=sector, limit=limit)
+
+
+@app.post("/api/simulate-add")
+def simulate_add(req: SimulateAddRequest):
+    try:
+        return simulate_add_stock(
+            holdings=req.holdings,
+            added_symbol=req.added_symbol,
+            added_value=req.added_value,
+            period=req.period,
+            risk_free=req.risk_free,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ── Dev entry point ───────────────────────────────────────────────────────────
 
