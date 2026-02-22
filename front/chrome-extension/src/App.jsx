@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import './App.css'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -51,6 +51,18 @@ function sharpeVerdict(s) {
   if (s >= 0.5) return 'Decent — room to improve'
   if (s >= 0)   return 'Low return for the risk'
   return 'Losing ground on risk'
+}
+
+function valueDeltaCls(delta) {
+  if (delta > 0) return 'green'
+  if (delta < 0) return 'red'
+  return 'gray'
+}
+
+function signed(delta, digits = 2) {
+  const n = Number(delta || 0)
+  const prefix = n > 0 ? '+' : ''
+  return `${prefix}${n.toFixed(digits)}`
 }
 
 // ── Optimize Chart Component ───────────────────────────────────────────────────
@@ -165,15 +177,41 @@ function App() {
   const [optLoading, setOptLoading] = useState(false)
   const [optError,   setOptError]   = useState(null)
 
-  const isLive = divResult !== null || optResult !== null
+  const [stockOptions, setStockOptions] = useState([])
+  const [stockLoading, setStockLoading] = useState(false)
+  const [stockError, setStockError] = useState(null)
+  const [stockQuery, setStockQuery] = useState('')
+  const [selectedSymbol, setSelectedSymbol] = useState('')
+  const [testValue, setTestValue] = useState('500')
+  const [testResult, setTestResult] = useState(null)
+  const [testLoading, setTestLoading] = useState(false)
+  const [testError, setTestError] = useState(null)
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const isLive = divResult !== null || optResult !== null || testResult !== null
+
   useEffect(() => { handleScrape() }, [])
+  useEffect(() => { loadStockChoices() }, [])
 
   useEffect(() => {
     if (holdings.length > 0) runDiversity(holdings)
     else setDivResult(null)
   }, [holdings])
+
+  const filteredStocks = useMemo(() => {
+    const q = stockQuery.trim().toLowerCase()
+    if (!q) return stockOptions
+    return stockOptions.filter((stock) =>
+      stock.symbol.toLowerCase().includes(q) ||
+      stock.name.toLowerCase().includes(q) ||
+      stock.sector.toLowerCase().includes(q)
+    )
+  }, [stockOptions, stockQuery])
+
+  useEffect(() => {
+    if (!selectedSymbol && filteredStocks.length > 0) {
+      setSelectedSymbol(filteredStocks[0].symbol)
+    }
+  }, [filteredStocks, selectedSymbol])
 
   // ── Scrape ───────────────────────────────────────────────────────────────
   const handleScrape = async () => {
@@ -222,6 +260,22 @@ function App() {
     }
   }
 
+  // ── Stock list API ────────────────────────────────────────────────────────
+  const loadStockChoices = async () => {
+    setStockLoading(true)
+    setStockError(null)
+    try {
+      const resp = await fetch(`${API}/api/stocks?limit=700`)
+      if (!resp.ok) throw new Error(`Server ${resp.status}`)
+      const payload = await resp.json()
+      setStockOptions(payload.stocks ?? [])
+    } catch {
+      setStockError('Could not load stock list from backend.')
+    } finally {
+      setStockLoading(false)
+    }
+  }
+
   // ── Optimize API ──────────────────────────────────────────────────────────
   const handleOptimize = async () => {
     if (holdings.length === 0) {
@@ -248,7 +302,53 @@ function App() {
     }
   }
 
+  // ── Test Stock API ────────────────────────────────────────────────────────
+  const handleTestStock = async () => {
+    if (holdings.length === 0) {
+      setTestError('Scan your positions first on the Overview tab.')
+      return
+    }
+    if (!selectedSymbol) {
+      setTestError('Pick a stock symbol first.')
+      return
+    }
+    const parsedValue = Number(testValue)
+    if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+      setTestError('Enter a valid dollar amount greater than 0.')
+      return
+    }
+
+    setTestLoading(true)
+    setTestError(null)
+    try {
+      const resp = await fetch(`${API}/api/test-stock-impact`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          holdings,
+          symbol: selectedSymbol,
+          added_value: parsedValue,
+          period: '1y',
+        }),
+      })
+      if (!resp.ok) {
+        const detail = await resp.json().then((j) => j.detail).catch(() => resp.status)
+        throw new Error(detail)
+      }
+      setTestResult(await resp.json())
+    } catch (err) {
+      setTestError(String(err.message ?? err))
+    } finally {
+      setTestLoading(false)
+    }
+  }
+
   const ratingCls = divResult ? (RATING_CLS[divResult.metrics.rating] ?? 'gray') : null
+  const baseDiv = testResult?.baseline?.diversity?.metrics
+  const simDiv = testResult?.simulated?.diversity?.metrics
+  const hhiDelta = (simDiv?.hhi ?? 0) - (baseDiv?.hhi ?? 0)
+  const topDelta = (simDiv?.top_industry_weight_pct ?? 0) - (baseDiv?.top_industry_weight_pct ?? 0)
+  const entropyDelta = (simDiv?.entropy ?? 0) - (baseDiv?.entropy ?? 0)
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -285,6 +385,10 @@ function App() {
           <button className={`tab-btn ${tab === 'optimize' ? 'active' : ''}`}
                   onClick={() => setTab('optimize')}>
             ◎ Rebalance
+          </button>
+          <button className={`tab-btn ${tab === 'test-stock' ? 'active' : ''}`}
+                  onClick={() => setTab('test-stock')}>
+            ◌ Test Stock
           </button>
         </div>
 
@@ -427,6 +531,155 @@ function App() {
                     ? <>Click the button above to see<br />your personalized rebalancing plan<span className="cursor" /></>
                     : <>Scan your positions first<br />on the Overview tab<span className="cursor" /></>
                   }
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ══ TEST STOCK TAB ═════════════════════════════════════════════ */}        
+        {tab === 'test-stock' && (
+          <>
+            <div className="test-note">
+              Simulate adding one position and preview how your scores change.
+              Works with positions scraped from Fidelity and SoFi.
+            </div>
+
+            <div className="test-controls">
+              <div className="test-field">
+                <label className="test-label" htmlFor="stock-search">Find stock</label>
+                <input
+                  id="stock-search"
+                  className="test-input"
+                  type="text"
+                  value={stockQuery}
+                  onChange={(e) => setStockQuery(e.target.value)}
+                  placeholder="Search symbol, company, or sector"
+                />
+              </div>
+
+              <div className="test-field">
+                <label className="test-label" htmlFor="stock-select">Choose symbol</label>
+                <select
+                  id="stock-select"
+                  className="test-select"
+                  value={selectedSymbol}
+                  onChange={(e) => setSelectedSymbol(e.target.value)}
+                  disabled={stockLoading || filteredStocks.length === 0}
+                >
+                  {filteredStocks.length === 0 && <option value="">No matching stocks</option>}
+                  {filteredStocks.map((stock) => (
+                    <option key={stock.symbol} value={stock.symbol}>
+                      {stock.symbol} - {stock.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="test-field">
+                <label className="test-label" htmlFor="test-value">Add amount (USD)</label>
+                <input
+                  id="test-value"
+                  className="test-input"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={testValue}
+                  onChange={(e) => setTestValue(e.target.value)}
+                  placeholder="500"
+                />
+              </div>
+            </div>
+
+            <button className="opt-btn" onClick={handleTestStock} disabled={testLoading || stockLoading}>
+              {testLoading
+                ? <>SIMULATING<span className="dot">.</span><span className="dot">.</span><span className="dot">.</span></>
+                : '◌  RUN TEST STOCK IMPACT'}
+            </button>
+
+            {stockError && <div className="error-bar">{stockError}</div>}
+            {testError && <div className="error-bar">{testError}</div>}
+
+            {testResult && (
+              <>
+                <div className="metrics-grid">
+                  <div className="metric-card">
+                    <div className="metric-label">HHI Impact</div>
+                    <div className={`metric-num ${valueDeltaCls(hhiDelta)}`}>
+                      {signed(hhiDelta, 0)}
+                    </div>
+                    <div className="metric-sub">
+                      {baseDiv?.hhi} → {simDiv?.hhi}
+                    </div>
+                  </div>
+                  <div className="metric-card">
+                    <div className="metric-label">Top Sector Impact</div>
+                    <div className={`metric-num ${valueDeltaCls(-topDelta)}`}>
+                      {signed(topDelta)}%
+                    </div>
+                    <div className="metric-sub">
+                      {baseDiv?.top_industry_weight_pct}% → {simDiv?.top_industry_weight_pct}%
+                    </div>
+                  </div>
+                  <div className="metric-card">
+                    <div className="metric-label">Entropy Impact</div>
+                    <div className={`metric-num ${valueDeltaCls(entropyDelta)}`}>
+                      {signed(entropyDelta, 3)}
+                    </div>
+                    <div className="metric-sub">
+                      {baseDiv?.entropy} → {simDiv?.entropy}
+                    </div>
+                  </div>
+                  <div className="metric-card">
+                    <div className="metric-label">Rating Shift</div>
+                    <div className="metric-num cyan">{simDiv?.rating}</div>
+                    <div className="metric-sub">
+                      {baseDiv?.rating} → {simDiv?.rating}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="test-grid">
+                  <div className="test-box">
+                    <div className="test-box-title">Optimize</div>
+                    {testResult.baseline.optimize?.error || testResult.simulated.optimize?.error ? (
+                      <div className="test-box-sub">Optimizer unavailable: install backend numeric deps</div>
+                    ) : (
+                      <>
+                        <div className="test-line">Sharpe: {testResult.baseline.optimize?.sharpe} → {testResult.simulated.optimize?.sharpe}</div>
+                        <div className="test-line">Return: {signed((testResult.baseline.optimize?.annual_return ?? 0) * 100)}% → {signed((testResult.simulated.optimize?.annual_return ?? 0) * 100)}%</div>
+                        <div className="test-line">Vol: {((testResult.baseline.optimize?.annual_vol ?? 0) * 100).toFixed(2)}% → {((testResult.simulated.optimize?.annual_vol ?? 0) * 100).toFixed(2)}%</div>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="test-box">
+                    <div className="test-box-title">Volatility</div>
+                    {testResult.baseline.volatility?.error || testResult.simulated.volatility?.error ? (
+                      <div className="test-box-sub">Volatility model unavailable: install backend numeric deps</div>
+                    ) : (
+                      <>
+                        <div className="test-line">Tickers analyzed: {testResult.baseline.tickers?.length} → {testResult.simulated.tickers?.length}</div>
+                        <div className="test-line">Spikes: {(testResult.baseline.volatility?.volatility_analysis?.spike_tickers ?? []).length} → {(testResult.simulated.volatility?.volatility_analysis?.spike_tickers ?? []).length}</div>
+                        <div className="test-box-sub">Use this to test whether adding a stock increases short-term risk alerts.</div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {!testResult && !testLoading && (
+              <div className="empty">
+                <div className="empty-bars">
+                  {[12, 26, 17, 29, 20].map((h, i) => (
+                    <div key={i} className="empty-bar" style={{ height: `${h}px`, animationDelay: `${i * 0.1}s` }} />
+                  ))}
+                </div>
+                <div className="empty-label">
+                  Pick a stock and test amount<br />
+                  to preview diversity and risk impact
+                  <span className="cursor" />
                 </div>
               </div>
             )}
