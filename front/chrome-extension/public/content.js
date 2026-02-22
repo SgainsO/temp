@@ -213,17 +213,23 @@ function showVolatilityPanel(volData) {
   hdr.innerHTML = '<span>Ticker</span><span>Risk Level</span><span>Typical Monthly Swing</span>'
   panel.appendChild(hdr)
 
-  // Per-ticker rows
+  // Per-ticker rows (accordion)
   entries.forEach(([ticker, m]) => {
-    const isSpike  = m.volatility_spike
-    const risk     = volRisk(m.vol20)
-    const monthly  = toMonthly(m.vol20)
-    const swingTxt = monthly != null ? `~${monthly}% / month` : '—'
-    const spikeTxt = isSpike ? '  ⚡ recently spiked up' : ''
-    const pattern  = m.pattern || {}
+    const isSpike     = m.volatility_spike
+    const risk        = volRisk(m.vol20)
+    const monthly     = toMonthly(m.vol20)
+    const swingTxt    = monthly != null ? `~${monthly}% / month` : '—'
+    const spikeDir    = m.spike_direction === 'down' ? 'down' : 'up'
+    const spikeTxt    = isSpike ? `  ⚡ recently spiked ${spikeDir}` : ''
+    const spikeMonths = m.spike_months || []
 
+    // Accordion wrapper
+    const wrapper = document.createElement('div')
+    wrapper.style.cssText = 'cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.04);margin-bottom:1px;'
+
+    // Header row
     const row = document.createElement('div')
-    row.style.cssText = `display:grid;grid-template-columns:48px 1fr auto;gap:8px;padding:4px 0 2px;${isSpike ? 'background:rgba(255,71,87,0.04);border-radius:3px;padding:4px 4px 2px;' : ''}`
+    row.style.cssText = `display:grid;grid-template-columns:48px 1fr auto 12px;gap:8px;padding:4px 0 2px;${isSpike ? 'background:rgba(255,71,87,0.04);border-radius:3px;padding:4px 4px 2px;' : ''}`
 
     const symEl = document.createElement('span')
     symEl.style.cssText = 'font-weight:700;color:#8aaccc;'
@@ -237,23 +243,48 @@ function showVolatilityPanel(volData) {
     swingEl.style.cssText = `color:${risk.color};font-weight:700;white-space:nowrap;`
     swingEl.textContent = swingTxt
 
+    const chevron = document.createElement('span')
+    chevron.style.cssText = 'color:#3a6a8a;font-size:9px;align-self:center;display:inline-block;transition:transform 0.15s;'
+    chevron.textContent = '▾'
+
     row.appendChild(symEl)
     row.appendChild(riskEl)
     row.appendChild(swingEl)
-    panel.appendChild(row)
+    row.appendChild(chevron)
+    wrapper.appendChild(row)
 
-    // Plain-English pattern description (sub-row)
-    if (pattern.description) {
-      const patEl = document.createElement('div')
-      patEl.style.cssText = 'font-size:9px;color:#3a6a8a;padding:0 0 5px 56px;line-height:1.5;border-bottom:1px solid rgba(255,255,255,0.04);'
-      patEl.textContent = `↳ ${pattern.description}`
-      panel.appendChild(patEl)
+    // Accordion detail (hidden by default)
+    const detail = document.createElement('div')
+    detail.style.cssText = 'display:none;font-size:9px;padding:4px 4px 8px 56px;line-height:1.9;'
+
+    if (spikeMonths.length > 0) {
+      const label = document.createElement('div')
+      label.style.cssText = 'color:#2e6a9a;margin-bottom:3px;letter-spacing:0.05em;'
+      label.textContent = 'Typical spike months (5yr avg):'
+      detail.appendChild(label)
+
+      spikeMonths.forEach(sm => {
+        const item = document.createElement('div')
+        const arrow = sm.direction === 'up' ? '▲' : '▼'
+        const color = sm.direction === 'up' ? '#00cc66' : '#ff4757'
+        item.innerHTML = `<span style="color:${color};font-weight:700;">${arrow} ${sm.month}</span>&nbsp;&nbsp;<span style="color:#8aaccc;">${sm.avg_pct > 0 ? '+' : ''}${sm.avg_pct}%</span>`
+        detail.appendChild(item)
+      })
     } else {
-      // just add the separator border
-      const sep = document.createElement('div')
-      sep.style.cssText = 'border-bottom:1px solid rgba(255,255,255,0.04);margin-bottom:1px;'
-      panel.appendChild(sep)
+      detail.style.color = '#3a5578'
+      detail.textContent = 'No consistent monthly spike pattern detected.'
     }
+
+    wrapper.appendChild(detail)
+
+    // Toggle accordion on click
+    wrapper.addEventListener('click', () => {
+      const open = detail.style.display !== 'none'
+      detail.style.display = open ? 'none' : 'block'
+      chevron.style.transform = open ? '' : 'rotate(180deg)'
+    })
+
+    panel.appendChild(wrapper)
   })
 
   // Footer
