@@ -92,7 +92,7 @@ def clean_holdings(raw_holdings: list) -> list:
             continue
         value = _parse_num(value_field)
         if math.isfinite(value) and value >= 0:
-            result.append({"industry": industry, "value": value, "mutual_fund": mutual_fund})
+            result.append({"symbol": symbol, "industry": industry, "value": value, "mutual_fund": mutual_fund})
     return result
 
 

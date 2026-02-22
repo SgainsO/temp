@@ -45,7 +45,7 @@ function getTip() {
       'font-size:10px',
       'color:#c9d8ed',
       'line-height:1.55',
-      'max-width:220px',
+      'max-width:280px',
       'box-shadow:0 6px 24px rgba(0,0,0,0.6)',
       'pointer-events:none',
       'display:none',
@@ -107,7 +107,7 @@ function showAllocationPanel(allocations) {
 
   const title = document.createElement('div')
   title.style.cssText = 'font-size:10px;letter-spacing:0.12em;color:#5aadde;text-transform:uppercase;margin-bottom:8px;padding-right:16px;'
-  title.textContent = '⬡ Hackalytics — Recommended Allocation'
+  title.textContent = '⬡ SafePlay — Recommended Allocation'
   panel.appendChild(title)
 
   const hdr = document.createElement('div')
@@ -218,6 +218,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // Show volatility analysis in separate floating panel
       runVolatility(data)
 
+      // Show cluster analysis panel
+      showClusterPanel()
+
       sendResponse({ data })
     }).catch((err) => {
       console.error('[Hackalytics] Scrape error:', err)
@@ -283,7 +286,7 @@ function showVolatilityPanel(volData) {
   // Title
   const title = document.createElement('div')
   title.style.cssText = 'font-size:10px;letter-spacing:0.12em;color:#5aadde;text-transform:uppercase;margin-bottom:8px;padding-right:16px;'
-  title.textContent = '⬡ Hackalytics — Risk Report'
+  title.textContent = '⬡ SafePlay — Risk Report'
   panel.appendChild(title)
 
   // Plain-English alert
@@ -404,6 +407,55 @@ function showVolatilityPanel(volData) {
   panel.appendChild(footer)
 
   // Close button
+  const close = document.createElement('button')
+  close.textContent = '✕'
+  close.style.cssText = 'position:absolute;top:8px;right:10px;background:none;border:none;color:#8aaccc;cursor:pointer;font-size:12px;padding:0;'
+  close.onclick = () => panel.remove()
+  panel.appendChild(close)
+
+  document.body.appendChild(panel)
+  makeDraggable(panel, title)
+}
+
+// ── Cluster Analysis panel ───────────────────────────────────────────────────
+
+function showClusterPanel() {
+  const existing = document.getElementById('hka-cluster-panel')
+  if (existing) existing.remove()
+
+  const panel = document.createElement('div')
+  panel.id = 'hka-cluster-panel'
+  panel.style.cssText = [
+    'position:fixed',
+    'top:24px',
+    'right:24px',
+    'z-index:999999',
+    'background:#0d1a2a',
+    'border:1px solid #1e3a5a',
+    'border-radius:8px',
+    'padding:12px 14px',
+    'font-family:ui-monospace,monospace',
+    'font-size:12px',
+    'color:#c9d8ed',
+    'box-shadow:0 4px 24px rgba(0,0,0,0.5)',
+    'min-width:240px',
+    'min-height:80px',
+    'overflow:auto',
+    'resize:both',
+  ].join(';')
+
+  const title = document.createElement('div')
+  title.style.cssText = 'font-size:10px;letter-spacing:0.12em;color:#5aadde;text-transform:uppercase;margin-bottom:8px;padding-right:16px;'
+  title.textContent = '⬡ SafePlay — Cluster Analysis'
+  addTip(title, 'Shows how your stocks cluster together based on how similarly they move. Stocks grouped close together tend to rise and fall at the same time — meaning they don\'t protect each other when one goes down.')
+  panel.appendChild(title)
+
+  const img = document.createElement('img')
+  img.src = chrome.runtime.getURL('Cluster_Analysis_.png')
+  img.alt = 'Cluster Analysis'
+  img.style.cssText = 'max-width:100%;border-radius:4px;display:block;'
+  panel.appendChild(img)
+
   const close = document.createElement('button')
   close.textContent = '✕'
   close.style.cssText = 'position:absolute;top:8px;right:10px;background:none;border:none;color:#8aaccc;cursor:pointer;font-size:12px;padding:0;'

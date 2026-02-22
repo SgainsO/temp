@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "My Extension",
+  "name": "SafePlay",
   "version": "1.0.0",
-  "description": "A simple Chrome extension built with React + Vite",
+  "description": "A chrome extension to help with your portfolio. Not official financial advice.",
   "action": {
     "default_popup": "index.html"
   },
@@ -19,6 +19,12 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["Cluster_Analysis_.png"],
+      "matches": ["<all_urls>"]
     }
   ]
 }
