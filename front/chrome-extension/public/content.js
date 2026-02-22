@@ -200,7 +200,7 @@ function showVolatilityPanel(volData) {
   const alertEl = document.createElement('div')
   if (spikes.length > 0) {
     alertEl.style.cssText = 'font-size:10px;color:#ff4757;background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.25);border-radius:4px;padding:6px 8px;margin-bottom:8px;line-height:1.6;'
-    alertEl.textContent = `⚠  ${spikes.length} of your stocks are moving much more than their recent average. You may want to reduce your exposure to ${spikes.join(', ')}.`
+    alertEl.textContent = `⚠  ${spikes.length} of your stocks are moving much more than their recent average. ${spikes.join(', ')}.`
   } else {
     alertEl.style.cssText = 'font-size:10px;color:#00ff88;background:rgba(0,255,136,0.06);border:1px solid rgba(0,255,136,0.2);border-radius:4px;padding:6px 8px;margin-bottom:8px;'
     alertEl.textContent = '✓  All stocks are moving at their expected pace — no unusual activity.'
