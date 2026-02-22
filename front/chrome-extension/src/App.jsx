@@ -53,16 +53,73 @@ function sharpeVerdict(s) {
   return 'Losing ground on risk'
 }
 
-function valueDeltaCls(delta) {
-  if (delta > 0) return 'green'
-  if (delta < 0) return 'red'
-  return 'gray'
-}
-
 function signed(delta, digits = 2) {
   const n = Number(delta || 0)
   const prefix = n > 0 ? '+' : ''
   return `${prefix}${n.toFixed(digits)}`
+}
+
+function topHoldingPct(valueByTicker) {
+  const values = Object.values(valueByTicker || {}).map((v) => Number(v || 0)).filter((v) => v > 0)
+  if (values.length === 0) return 0
+  const total = values.reduce((a, b) => a + b, 0)
+  const top = Math.max(...values)
+  return total > 0 ? (top / total) * 100 : 0
+}
+
+function avgPortfolioVol(volResult) {
+  const metrics = volResult?.volatility_analysis?.annualized_volatility || {}
+  const vols = Object.values(metrics)
+    .map((m) => Number(m?.vol20))
+    .filter((v) => Number.isFinite(v) && v > 0)
+  if (vols.length === 0) return null
+  return vols.reduce((a, b) => a + b, 0) / vols.length
+}
+
+function clamp(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, v))
+}
+
+function scoreFromConcentration(hhi) {
+  if (!Number.isFinite(hhi)) return null
+  return clamp(100 - (hhi / 10000) * 100, 0, 100)
+}
+
+function scoreFromDiversification(entropy) {
+  if (!Number.isFinite(entropy)) return null
+  return clamp((entropy / 2.4) * 100, 0, 100)
+}
+
+function scoreFromVolatility(avgVol) {
+  if (!Number.isFinite(avgVol)) return null
+  const pct = avgVol * 100
+  return clamp(100 - ((pct - 10) / 40) * 100, 0, 100)
+}
+
+function scoreFromSharpe(sharpe) {
+  if (!Number.isFinite(sharpe)) return null
+  return clamp(((sharpe + 0.5) / 2.5) * 100, 0, 100)
+}
+
+function portfolioHealthIndex({ hhi, entropy, avgVol, sharpe }) {
+  const parts = [
+    { w: 0.4, v: scoreFromConcentration(hhi) },
+    { w: 0.25, v: scoreFromDiversification(entropy) },
+    { w: 0.2, v: scoreFromVolatility(avgVol) },
+    { w: 0.15, v: scoreFromSharpe(sharpe) },
+  ].filter((p) => p.v != null)
+
+  if (parts.length === 0) return null
+  const weightSum = parts.reduce((s, p) => s + p.w, 0)
+  const weighted = parts.reduce((s, p) => s + p.v * p.w, 0) / (weightSum || 1)
+  return Math.round(weighted)
+}
+
+function healthCls(score) {
+  if (score == null) return 'gray'
+  if (score >= 70) return 'green'
+  if (score >= 50) return 'amber'
+  return 'red'
 }
 
 // ── Tooltip ───────────────────────────────────────────────────────────────────
@@ -76,6 +133,44 @@ function Tip({ text, children }) {
       {children}
       {show && <span className="tip-box">{text}</span>}
     </span>
+  )
+}
+
+function HealthGauge({ label, score }) {
+  const cls = healthCls(score)
+  const safeScore = clamp(Number(score ?? 0), 0, 100)
+  const [animatedScore, setAnimatedScore] = useState(0)
+
+  useEffect(() => {
+    setAnimatedScore(0)
+    const raf = requestAnimationFrame(() => setAnimatedScore(safeScore))
+    return () => cancelAnimationFrame(raf)
+  }, [safeScore])
+
+  const arcRadius = 70
+  const arcLen = Math.PI * arcRadius
+  const dashOffset = arcLen * (1 - animatedScore / 100)
+  return (
+    <div className="health-gauge-card">
+      <div className="health-gauge-label">{label}</div>
+      <div className={`health-gauge ${cls}`}>
+        <svg viewBox="0 0 160 90" className="health-gauge-svg" aria-hidden="true">
+          <path
+            className="health-gauge-track"
+            d="M 10 80 A 70 70 0 0 1 150 80"
+          />
+          <path
+            className={`health-gauge-progress ${cls}`}
+            d="M 10 80 A 70 70 0 0 1 150 80"
+            style={{ strokeDasharray: arcLen, strokeDashoffset: dashOffset }}
+          />
+        </svg>
+        <div className="health-gauge-center">
+          <div className={`health-gauge-score ${cls}`}>{score == null ? '--' : Math.round(animatedScore)}</div>
+          <div className="health-gauge-outof">/100</div>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -372,6 +467,63 @@ function App() {
   const hhiDelta = (simDiv?.hhi ?? 0) - (baseDiv?.hhi ?? 0)
   const topDelta = (simDiv?.top_industry_weight_pct ?? 0) - (baseDiv?.top_industry_weight_pct ?? 0)
   const entropyDelta = (simDiv?.entropy ?? 0) - (baseDiv?.entropy ?? 0)
+  const effectiveDelta = (simDiv?.effective_industries ?? 0) - (baseDiv?.effective_industries ?? 0)
+
+  const baseTopHoldingPct = topHoldingPct(testResult?.baseline?.value_by_ticker)
+  const simTopHoldingPct = topHoldingPct(testResult?.simulated?.value_by_ticker)
+
+  const baseAvgVol = avgPortfolioVol(testResult?.baseline?.volatility)
+  const simAvgVol = avgPortfolioVol(testResult?.simulated?.volatility)
+  const volDelta = (simAvgVol ?? 0) - (baseAvgVol ?? 0)
+
+  const divStatus = topDelta > 0.00001
+    ? { word: 'Worse', cls: 'red' }
+    : (hhiDelta < -0.00001 || effectiveDelta > 0.00001)
+      ? { word: 'Improved', cls: 'green' }
+      : { word: 'Neutral', cls: 'amber' }
+
+  const volStatus = (simAvgVol == null || baseAvgVol == null)
+    ? { word: 'Unknown', cls: 'gray' }
+    : volDelta > 0.00001
+      ? { word: 'Higher', cls: 'red' }
+      : volDelta < -0.00001
+        ? { word: 'Lower', cls: 'green' }
+        : { word: 'Neutral', cls: 'amber' }
+
+  const baseOpt = testResult?.baseline?.optimize
+  const simOpt = testResult?.simulated?.optimize
+  const optUnavailable = Boolean(baseOpt?.error || simOpt?.error)
+  const baseSharpe = Number(baseOpt?.sharpe ?? 0)
+  const simSharpe = Number(simOpt?.sharpe ?? 0)
+  const sharpeDelta = simSharpe - baseSharpe
+  const sharpeStatus = optUnavailable
+    ? { word: 'Unknown', cls: 'gray' }
+    : sharpeDelta > 0.001
+      ? { word: 'Higher', cls: 'green' }
+      : sharpeDelta < -0.001
+        ? { word: 'Lower', cls: 'red' }
+        : { word: 'Neutral', cls: 'amber' }
+  const baseTop3 = Object.entries(baseOpt?.weights || {}).sort((a, b) => b[1] - a[1]).slice(0, 3)
+  const simTop3 = Object.entries(simOpt?.weights || {}).sort((a, b) => b[1] - a[1]).slice(0, 3)
+  const optChanged = !optUnavailable && (
+    Math.abs(simSharpe - baseSharpe) > 0.001 ||
+    JSON.stringify(baseTop3.map(([t, w]) => [t, Number(w).toFixed(3)])) !==
+      JSON.stringify(simTop3.map(([t, w]) => [t, Number(w).toFixed(3)]))
+  )
+
+  const baseHealth = portfolioHealthIndex({
+    hhi: baseDiv?.hhi,
+    entropy: baseDiv?.entropy,
+    avgVol: baseAvgVol,
+    sharpe: optUnavailable ? null : baseSharpe,
+  })
+  const simHealth = portfolioHealthIndex({
+    hhi: simDiv?.hhi,
+    entropy: simDiv?.entropy,
+    avgVol: simAvgVol,
+    sharpe: optUnavailable ? null : simSharpe,
+  })
+  const healthDelta = (simHealth ?? 0) - (baseHealth ?? 0)
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -593,6 +745,11 @@ function App() {
               Simulate adding one position and preview how your scores change.
               Works with positions scraped from Fidelity and SoFi.
             </div>
+            <div className="method-pill">
+              <Tip text="Method: 1-year history window. Concentration from HHI, Diversification Score from entropy, Volatility from average annualized vol, and Sharpe from optimizer. Combined into a 0-100 Portfolio Health Index for before/after comparison only.">
+                Method
+              </Tip>
+            </div>
 
             <div className="test-controls">
               <div className="test-field" style={{ position: 'relative' }}>
@@ -654,81 +811,122 @@ function App() {
 
             {testResult && (
               <>
-                <div className="metrics-grid">
-                  <div className="metric-card">
-                    <div className="metric-label">
-                      <Tip text="Change in how concentrated your portfolio is. Negative = more spread out (good). Positive = putting more eggs in fewer baskets (riskier).">HHI Impact</Tip>
+                <div className="test-headline">
+                  If you add ${Number(testValue || 0).toLocaleString()} of {selectedSymbol}...
+                </div>
+
+                <div className="health-section">
+                  <div className="health-header">
+                    <span className="health-title">
+                      <Tip text="Portfolio Health Index is a comparison score from 0 to 100. Higher means healthier balance across concentration, diversification, volatility, and risk-adjusted return.">
+                        Portfolio Health Index
+                      </Tip>
+                    </span>
+                    <span className={`health-delta ${healthDelta > 0 ? 'green' : healthDelta < 0 ? 'red' : 'amber'}`}>
+                      {healthDelta > 0 ? '+' : ''}{healthDelta}
+                    </span>
+                  </div>
+                  <div className="health-row">
+                    <HealthGauge label="Current" score={baseHealth} />
+                    <HealthGauge label="After Add" score={simHealth} />
+                  </div>
+                </div>
+
+                <div className="impact-grid">
+                  <div className="impact-card">
+                    <div className="impact-label">
+                      <Tip text="How spread out your portfolio is across different areas. Better diversification means one area has less power over your total results.">Diversification Impact</Tip>
                     </div>
-                    <div className={`metric-num ${valueDeltaCls(hhiDelta)}`}>
-                      {signed(hhiDelta, 0)}
+                    <div className={`impact-value ${divStatus.cls}`}>{divStatus.word}</div>
+                    <div className="impact-sub">
+                      Top sector {baseDiv?.top_industry_weight_pct?.toFixed(2)}% → {simDiv?.top_industry_weight_pct?.toFixed(2)}%
+                      {' '}({topDelta >= 0 ? 'Worse' : 'Better'})
                     </div>
-                    <div className="metric-sub">
-                      {baseDiv?.hhi} → {simDiv?.hhi}
+                    <div className="impact-sub">
+                      Driver: top sector concentration {topDelta >= 0 ? '↑' : '↓'} {Math.abs(topDelta).toFixed(2)}%
                     </div>
                   </div>
-                  <div className="metric-card">
-                    <div className="metric-label">
-                      <Tip text="Change in how much of your portfolio sits in one industry. Negative = your biggest sector's grip shrinks (good for balance).">Top Sector Impact</Tip>
+
+                  <div className="impact-card">
+                    <div className="impact-label">
+                      <Tip text="How much your portfolio tends to swing. Higher volatility means larger up-and-down moves over time.">Volatility Impact</Tip>
                     </div>
-                    <div className={`metric-num ${valueDeltaCls(-topDelta)}`}>
-                      {signed(topDelta)}%
-                    </div>
-                    <div className="metric-sub">
-                      {baseDiv?.top_industry_weight_pct}% → {simDiv?.top_industry_weight_pct}%
-                    </div>
-                  </div>
-                  <div className="metric-card">
-                    <div className="metric-label">
-                      <Tip text="Change in how evenly your money is spread. Positive = more balanced (good). Negative = your holdings are getting more lopsided.">Entropy Impact</Tip>
-                    </div>
-                    <div className={`metric-num ${valueDeltaCls(entropyDelta)}`}>
-                      {signed(entropyDelta, 3)}
-                    </div>
-                    <div className="metric-sub">
-                      {baseDiv?.entropy} → {simDiv?.entropy}
+                    <div className={`impact-value ${volStatus.cls}`}>{volStatus.word}</div>
+                    <div className="impact-sub">
+                      Portfolio volatility: {baseAvgVol == null ? '-' : `${(baseAvgVol * 100).toFixed(2)}%`}
+                      {' '}→ {simAvgVol == null ? '-' : `${(simAvgVol * 100).toFixed(2)}%`}
                     </div>
                   </div>
-                  <div className="metric-card">
-                    <div className="metric-label">
-                      <Tip text="Your overall portfolio health grade before and after adding this stock. 'Well Diversified' is the goal — it means your risk is spread across many areas.">Rating Shift</Tip>
+
+                  <div className="impact-card">
+                    <div className="impact-label">
+                      <Tip text="Return per unit of risk in past data. Higher Sharpe means the portfolio earned more reward for each unit of volatility.">Sharpe Impact</Tip>
                     </div>
-                    <div className="metric-num cyan">{simDiv?.rating}</div>
-                    <div className="metric-sub">
-                      {baseDiv?.rating} → {simDiv?.rating}
+                    <div className={`impact-value ${sharpeStatus.cls}`}>{sharpeStatus.word}</div>
+                    <div className="impact-sub">
+                      Sharpe: {optUnavailable ? '-' : baseSharpe.toFixed(3)} → {optUnavailable ? '-' : simSharpe.toFixed(3)}
                     </div>
+                  </div>
+
+                  <div className="impact-card">
+                    <div className="impact-label">
+                      <Tip text="How much your portfolio relies on one area. High concentration means one theme can dominate your results.">Concentration</Tip>
+                    </div>
+                    <div className={`impact-value ${topDelta > 0 ? 'red' : topDelta < 0 ? 'green' : 'amber'}`}>
+                      {topDelta > 0 ? 'Higher' : topDelta < 0 ? 'Lower' : 'Neutral'}
+                    </div>
+                    <div className="impact-sub">Top sector: {baseDiv?.top_industry_weight_pct?.toFixed(2)}% → {simDiv?.top_industry_weight_pct?.toFixed(2)}%</div>
+                    <div className="impact-sub">Top holding: {baseTopHoldingPct.toFixed(2)}% → {simTopHoldingPct.toFixed(2)}%</div>
                   </div>
                 </div>
 
                 <div className="test-grid">
                   <div className="test-box">
                     <div className="test-box-title">
-                      <Tip text="How adding this stock changes your portfolio's quality score (return vs. risk) and expected annual performance.">Optimize</Tip>
+                      <Tip text="A suggested mix based on past data. It is not a prediction.">Suggested rebalance (optional)</Tip>
                     </div>
-                    {testResult.baseline.optimize?.error || testResult.simulated.optimize?.error ? (
-                      <div className="test-box-sub">Optimizer unavailable: install backend numeric deps</div>
+                    {optUnavailable ? (
+                      <div className="test-box-sub">Optimization unchanged / insufficient data.</div>
                     ) : (
                       <>
-                        <div className="test-line">Sharpe: {testResult.baseline.optimize?.sharpe} → {testResult.simulated.optimize?.sharpe}</div>
-                        <div className="test-line">Return: {signed((testResult.baseline.optimize?.annual_return ?? 0) * 100)}% → {signed((testResult.simulated.optimize?.annual_return ?? 0) * 100)}%</div>
-                        <div className="test-line">Vol: {((testResult.baseline.optimize?.annual_vol ?? 0) * 100).toFixed(2)}% → {((testResult.simulated.optimize?.annual_vol ?? 0) * 100).toFixed(2)}%</div>
+                        <div className="test-line">Optimized Sharpe: {simSharpe.toFixed(2)}</div>
+                        {optChanged ? (
+                          <div className="test-line">
+                            Top suggestions: {simTop3.map(([t, w]) => `${t} ${(Number(w) * 100).toFixed(1)}%`).join(' | ')}
+                          </div>
+                        ) : (
+                          <div className="test-box-sub">Optimization unchanged / insufficient data.</div>
+                        )}
+                        <div className="test-box-sub">This is based on last 1 year performance.</div>
                       </>
                     )}
                   </div>
 
                   <div className="test-box">
                     <div className="test-box-title">
-                      <Tip text="How adding this stock changes the number of positions showing unusually large price swings — a spike means that stock is moving way more than normal.">Volatility</Tip>
+                      <Tip text="Overall portfolio-health summary from the simulation, focused on diversification, volatility, and concentration.">Portfolio Health Summary</Tip>
                     </div>
-                    {testResult.baseline.volatility?.error || testResult.simulated.volatility?.error ? (
-                      <div className="test-box-sub">Volatility model unavailable: install backend numeric deps</div>
-                    ) : (
-                      <>
-                        <div className="test-line">Tickers analyzed: {testResult.baseline.tickers?.length} → {testResult.simulated.tickers?.length}</div>
-                        <div className="test-line">Spikes: {(testResult.baseline.volatility?.volatility_analysis?.spike_tickers ?? []).length} → {(testResult.simulated.volatility?.volatility_analysis?.spike_tickers ?? []).length}</div>
-                        <div className="test-box-sub">Use this to test whether adding a stock increases short-term risk alerts.</div>
-                      </>
+                    <div className="test-line">Status: {simDiv?.rating}</div>
+                    <div className="test-line">Diversification: {divStatus.word}</div>
+                    <div className="test-line">Volatility: {volStatus.word}</div>
+                    <div className="test-line">Sharpe: {sharpeStatus.word}</div>
+                  </div>
+                </div>
+
+                <details className="test-details">
+                  <summary>Details</summary>
+                  <div className="test-details-body">
+                    <div className="test-line">Concentration (HHI): {baseDiv?.hhi} → {simDiv?.hhi} ({signed(hhiDelta, 0)})</div>
+                    <div className="test-line">Diversification Score (Entropy): {baseDiv?.entropy} → {simDiv?.entropy} ({signed(entropyDelta, 4)})</div>
+                    <div className="test-line">Effective industries: {baseDiv?.effective_industries} → {simDiv?.effective_industries} ({signed(effectiveDelta, 2)})</div>
+                    {baseDiv?.rating !== simDiv?.rating && (
+                      <div className="test-line">Rating shift: {baseDiv?.rating} → {simDiv?.rating}</div>
                     )}
                   </div>
+                </details>
+
+                <div className="test-box-sub">
+                  This simulation is for portfolio-health comparison, not investment advice.
                 </div>
               </>
             )}
