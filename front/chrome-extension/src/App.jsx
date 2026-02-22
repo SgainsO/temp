@@ -771,7 +771,7 @@ function App() {
 
         {/* Footer */}
         <div className="footer">
-          <span>Hackalytics v0.1</span>
+          <span>Safeplay v0.1</span>
           <span>◉ localhost:8787</span>
         </div>
 

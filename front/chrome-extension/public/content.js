@@ -107,7 +107,7 @@ function showAllocationPanel(allocations) {
 
   const title = document.createElement('div')
   title.style.cssText = 'font-size:10px;letter-spacing:0.12em;color:#5aadde;text-transform:uppercase;margin-bottom:8px;padding-right:16px;'
-  title.textContent = '⬡ Hackalytics — Recommended Allocation'
+  title.textContent = '⬡ SafePlay — Recommended Allocation'
   panel.appendChild(title)
 
   const hdr = document.createElement('div')
@@ -286,7 +286,7 @@ function showVolatilityPanel(volData) {
   // Title
   const title = document.createElement('div')
   title.style.cssText = 'font-size:10px;letter-spacing:0.12em;color:#5aadde;text-transform:uppercase;margin-bottom:8px;padding-right:16px;'
-  title.textContent = '⬡ Hackalytics — Risk Report'
+  title.textContent = '⬡ SafePlay — Risk Report'
   panel.appendChild(title)
 
   // Plain-English alert
@@ -446,7 +446,7 @@ function showClusterPanel() {
 
   const title = document.createElement('div')
   title.style.cssText = 'font-size:10px;letter-spacing:0.12em;color:#5aadde;text-transform:uppercase;margin-bottom:8px;padding-right:16px;'
-  title.textContent = '⬡ Hackalytics — Cluster Analysis'
+  title.textContent = '⬡ SafePlay — Cluster Analysis'
   addTip(title, 'Shows how your stocks cluster together based on how similarly they move. Stocks grouped close together tend to rise and fall at the same time — meaning they don\'t protect each other when one goes down.')
   panel.appendChild(title)
 
