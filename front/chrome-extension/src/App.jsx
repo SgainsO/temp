@@ -65,11 +65,26 @@ function signed(delta, digits = 2) {
   return `${prefix}${n.toFixed(digits)}`
 }
 
+// ── Tooltip ───────────────────────────────────────────────────────────────────
+
+function Tip({ text, children }) {
+  const [show, setShow] = useState(false)
+  return (
+    <span className="tip-wrap"
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}>
+      {children}
+      {show && <span className="tip-box">{text}</span>}
+    </span>
+  )
+}
+
 // ── Optimize Chart Component ───────────────────────────────────────────────────
 
-function WeightChart({ optResult }) {
+function WeightChart({ optResult, period }) {
   const { tickers, weights: opt, current_weights: cur,
           sharpe, annual_return, annual_vol } = optResult
+  const periodLabel = period ? period.replace('y', period === '1y' ? ' year' : ' years') : '5 years'
 
   const allWeights = tickers.flatMap(t => [opt[t] ?? 0, cur[t] ?? 0])
   const maxW = Math.max(...allWeights, 0.01)
@@ -81,28 +96,34 @@ function WeightChart({ optResult }) {
     <>
       {/* Plain-English summary */}
       <div className="opt-summary">
-        Based on 2 years of price history, here is how shifting your holdings
+        Based on {periodLabel} of price history, here is how shifting your holdings
         could improve your returns relative to the risk you take.
       </div>
 
       {/* Stats row */}
       <div className="opt-stats">
         <div className="opt-stat-card">
-          <div className="opt-stat-label">Quality Score</div>
+          <div className="opt-stat-label">
+            <Tip text="How much return you're getting for the risk you take. Above 1.0 is solid — like getting a fair wage for hard work. Below 0.5 means you're risking a lot for little reward.">Quality Score</Tip>
+          </div>
           <div className={`opt-stat-num ${sharpe >= 1 ? 'green' : sharpe >= 0.5 ? 'cyan' : 'red'}`}>
             {sharpe.toFixed(2)}
           </div>
           <div className="opt-stat-sub">{sharpeVerdict(sharpe)}</div>
         </div>
         <div className="opt-stat-card">
-          <div className="opt-stat-label">Expected Gain / Year</div>
+          <div className="opt-stat-label">
+            <Tip text="A rough estimate of how much your portfolio might grow in a year, based on past prices. It's not a guarantee — the future can always surprise you.">Expected Gain / Year</Tip>
+          </div>
           <div className={`opt-stat-num ${retCls(annual_return)}`}>
             {annual_return >= 0 ? '+' : ''}{(annual_return * 100).toFixed(1)}%
           </div>
           <div className="opt-stat-sub">If history repeats</div>
         </div>
         <div className="opt-stat-card">
-          <div className="opt-stat-label">Expected Swings</div>
+          <div className="opt-stat-label">
+            <Tip text="How much your portfolio value might go up or down over a year. A 20% swing on $10,000 means it could change by $2,000 in either direction — totally normal, not necessarily bad.">Expected Swings</Tip>
+          </div>
           <div className="opt-stat-num">{(annual_vol * 100).toFixed(1)}%</div>
           <div className="opt-stat-sub">How much it may move yearly</div>
         </div>
@@ -176,6 +197,7 @@ function App() {
   const [optResult,  setOptResult]  = useState(null)
   const [optLoading, setOptLoading] = useState(false)
   const [optError,   setOptError]   = useState(null)
+  const [optPeriod,  setOptPeriod]  = useState('5y')
 
   const [stockOptions, setStockOptions] = useState([])
   const [stockLoading, setStockLoading] = useState(false)
@@ -289,7 +311,7 @@ function App() {
       const resp = await fetch(`${API}/api/optimize-from-holdings`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ data: holdings }),
+        body:    JSON.stringify({ data: holdings, period: optPeriod }),
       })
       if (!resp.ok) {
         const detail = await resp.json().then(j => j.detail).catch(() => resp.status)
@@ -359,8 +381,8 @@ function App() {
         {/* Header */}
         <div className="hdr">
           <div>
-            <div className="brand-name">⬡ Hackalytics</div>
-            <div className="brand-sub">Fidelity + SoFi Position Analyzer</div>
+            <div className="brand-name">⬡ Safeplay</div>
+            <div className="brand-sub">Saftey Position Analyzer</div>
           </div>
           <div className={`hdr-status ${isLive ? 'live' : ''}`}>
             <div className={`status-dot ${isLive ? 'live' : ''}`} />
@@ -432,26 +454,34 @@ function App() {
               return (
                 <div className="metrics-grid">
                   <div className="metric-card">
-                    <div className="metric-label">Concentration</div>
+                    <div className="metric-label">
+                      <Tip text="Think of this as 'eggs in one basket.' Under 1,500 = money spread across many areas (safer). Over 2,500 = most of your money is in a few places (riskier).">Concentration</Tip>
+                    </div>
                     <div className={`metric-num ${hhiCls(divResult.metrics.hhi)}`}>
                       {divResult.metrics.hhi.toLocaleString()}
                     </div>
                     <div className="metric-sub">{hhiVerdict(divResult.metrics.hhi)}</div>
                   </div>
                   <div className="metric-card">
-                    <div className="metric-label">Real Sectors</div>
+                    <div className="metric-label">
+                      <Tip text="How many truly different industries your money is actually working in. More = better protection. If one industry has a bad year, it won't tank your whole portfolio.">Real Sectors</Tip>
+                    </div>
                     <div className="metric-num cyan">{divResult.metrics.effective_industries}</div>
                     <div className="metric-sub">Meaningfully distinct bets</div>
                   </div>
                   <div className="metric-card">
-                    <div className="metric-label">Biggest Bet</div>
+                    <div className="metric-label">
+                      <Tip text="The largest single industry slice of your portfolio. If this is over 40%, a bad year in that one sector could seriously hurt your returns.">Biggest Bet</Tip>
+                    </div>
                     <div className={`metric-num ${topCls(divResult.metrics.top_industry_weight_pct)}`}>
                       {divResult.metrics.top_industry_weight_pct}%
                     </div>
                     <div className="metric-sub">{topVerdict(divResult.metrics.top_industry_weight_pct)}</div>
                   </div>
                   <div className="metric-card">
-                    <div className="metric-label">Balance</div>
+                    <div className="metric-label">
+                      <Tip text="A grade on how evenly your money is spread. 'Great' = no single area dominates. 'Poor' = your money is clumped in just a few places, which amplifies risk.">Balance</Tip>
+                    </div>
                     <div className={`metric-num ${balance.cls}`}>{balance.word}</div>
                     <div className="metric-sub">How evenly spread your holdings are</div>
                   </div>
@@ -502,6 +532,24 @@ function App() {
         {/* ══ REBALANCE TAB ══════════════════════════════════════════════ */}
         {tab === 'optimize' && (
           <>
+            <div className="period-row">
+              <span className="period-label">Lookback</span>
+              {['1y','2y','3y','5y','10y'].map(p => (
+                <button
+                  key={p}
+                  className={`period-btn ${optPeriod === p ? 'active' : ''}`}
+                  onClick={() => { setOptPeriod(p); setOptResult(null) }}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+            {(optPeriod === '1y' || optPeriod === '2y') && (
+              <div className="period-warn">
+                ⚠ Short windows can be skewed by a single bull or bear market — treat these numbers as rough estimates.
+              </div>
+            )}
+
             <button className="opt-btn" onClick={handleOptimize} disabled={optLoading}>
               {optLoading
                 ? <>CALCULATING<span className="dot">.</span><span className="dot">.</span><span className="dot">.</span></>
@@ -511,13 +559,13 @@ function App() {
             {optLoading && (
               <div className="loading-row">
                 <div className="spinner cyan" />
-                <span className="loading-label cyan">Crunching 2 years of data</span>
+                <span className="loading-label cyan">Crunching {optPeriod} of data…</span>
               </div>
             )}
 
             {optError && <div className="error-bar">{optError}</div>}
 
-            {optResult && <WeightChart optResult={optResult} />}
+            {optResult && <WeightChart optResult={optResult} period={optPeriod} />}
 
             {!optResult && !optLoading && !optError && (
               <div className="empty">
@@ -608,7 +656,9 @@ function App() {
               <>
                 <div className="metrics-grid">
                   <div className="metric-card">
-                    <div className="metric-label">HHI Impact</div>
+                    <div className="metric-label">
+                      <Tip text="Change in how concentrated your portfolio is. Negative = more spread out (good). Positive = putting more eggs in fewer baskets (riskier).">HHI Impact</Tip>
+                    </div>
                     <div className={`metric-num ${valueDeltaCls(hhiDelta)}`}>
                       {signed(hhiDelta, 0)}
                     </div>
@@ -617,7 +667,9 @@ function App() {
                     </div>
                   </div>
                   <div className="metric-card">
-                    <div className="metric-label">Top Sector Impact</div>
+                    <div className="metric-label">
+                      <Tip text="Change in how much of your portfolio sits in one industry. Negative = your biggest sector's grip shrinks (good for balance).">Top Sector Impact</Tip>
+                    </div>
                     <div className={`metric-num ${valueDeltaCls(-topDelta)}`}>
                       {signed(topDelta)}%
                     </div>
@@ -626,7 +678,9 @@ function App() {
                     </div>
                   </div>
                   <div className="metric-card">
-                    <div className="metric-label">Entropy Impact</div>
+                    <div className="metric-label">
+                      <Tip text="Change in how evenly your money is spread. Positive = more balanced (good). Negative = your holdings are getting more lopsided.">Entropy Impact</Tip>
+                    </div>
                     <div className={`metric-num ${valueDeltaCls(entropyDelta)}`}>
                       {signed(entropyDelta, 3)}
                     </div>
@@ -635,7 +689,9 @@ function App() {
                     </div>
                   </div>
                   <div className="metric-card">
-                    <div className="metric-label">Rating Shift</div>
+                    <div className="metric-label">
+                      <Tip text="Your overall portfolio health grade before and after adding this stock. 'Well Diversified' is the goal — it means your risk is spread across many areas.">Rating Shift</Tip>
+                    </div>
                     <div className="metric-num cyan">{simDiv?.rating}</div>
                     <div className="metric-sub">
                       {baseDiv?.rating} → {simDiv?.rating}
@@ -645,7 +701,9 @@ function App() {
 
                 <div className="test-grid">
                   <div className="test-box">
-                    <div className="test-box-title">Optimize</div>
+                    <div className="test-box-title">
+                      <Tip text="How adding this stock changes your portfolio's quality score (return vs. risk) and expected annual performance.">Optimize</Tip>
+                    </div>
                     {testResult.baseline.optimize?.error || testResult.simulated.optimize?.error ? (
                       <div className="test-box-sub">Optimizer unavailable: install backend numeric deps</div>
                     ) : (
@@ -658,7 +716,9 @@ function App() {
                   </div>
 
                   <div className="test-box">
-                    <div className="test-box-title">Volatility</div>
+                    <div className="test-box-title">
+                      <Tip text="How adding this stock changes the number of positions showing unusually large price swings — a spike means that stock is moving way more than normal.">Volatility</Tip>
+                    </div>
                     {testResult.baseline.volatility?.error || testResult.simulated.volatility?.error ? (
                       <div className="test-box-sub">Volatility model unavailable: install backend numeric deps</div>
                     ) : (
