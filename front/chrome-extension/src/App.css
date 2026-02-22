@@ -755,6 +755,58 @@
   color: #3a5578;
 }
 
+.stock-dropdown {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  background: #0f1a2e;
+  border: 1px solid rgba(0,212,255,0.25);
+  border-radius: 5px;
+  z-index: 100;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+.stock-option {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-family: ui-monospace, 'Cascadia Code', 'Courier New', monospace;
+  font-size: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.stock-option:last-child { border-bottom: none; }
+
+.stock-option:hover,
+.stock-option.selected {
+  background: rgba(0,212,255,0.08);
+}
+
+.stock-sym {
+  color: #00d4ff;
+  min-width: 48px;
+  font-weight: 600;
+}
+
+.stock-name {
+  color: #8aaccc;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stock-sector {
+  color: #3a5578;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
 .test-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

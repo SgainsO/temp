@@ -186,6 +186,7 @@ function App() {
   const [testResult, setTestResult] = useState(null)
   const [testLoading, setTestLoading] = useState(false)
   const [testError, setTestError] = useState(null)
+  const [showDropdown, setShowDropdown] = useState(false)
 
   const isLive = divResult !== null || optResult !== null || testResult !== null
 
@@ -199,12 +200,12 @@ function App() {
 
   const filteredStocks = useMemo(() => {
     const q = stockQuery.trim().toLowerCase()
-    if (!q) return stockOptions
+    if (!q) return stockOptions.slice(0, 50)
     return stockOptions.filter((stock) =>
       stock.symbol.toLowerCase().includes(q) ||
       stock.name.toLowerCase().includes(q) ||
       stock.sector.toLowerCase().includes(q)
-    )
+    ).slice(0, 50)
   }, [stockOptions, stockQuery])
 
   useEffect(() => {
@@ -268,7 +269,7 @@ function App() {
       const resp = await fetch(`${API}/api/stocks?limit=700`)
       if (!resp.ok) throw new Error(`Server ${resp.status}`)
       const payload = await resp.json()
-      setStockOptions(payload.stocks ?? [])
+      setStockOptions(payload ?? [])
     } catch {
       setStockError('Could not load stock list from backend.')
     } finally {
@@ -321,12 +322,12 @@ function App() {
     setTestLoading(true)
     setTestError(null)
     try {
-      const resp = await fetch(`${API}/api/test-stock-impact`, {
+      const resp = await fetch(`${API}/api/simulate-add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           holdings,
-          symbol: selectedSymbol,
+          added_symbol: selectedSymbol,
           added_value: parsedValue,
           period: '1y',
         }),
@@ -546,34 +547,37 @@ function App() {
             </div>
 
             <div className="test-controls">
-              <div className="test-field">
-                <label className="test-label" htmlFor="stock-search">Find stock</label>
+              <div className="test-field" style={{ position: 'relative' }}>
+                <label className="test-label">Stock symbol</label>
                 <input
-                  id="stock-search"
                   className="test-input"
                   type="text"
                   value={stockQuery}
-                  onChange={(e) => setStockQuery(e.target.value)}
-                  placeholder="Search symbol, company, or sector"
+                  onChange={(e) => { setStockQuery(e.target.value); setSelectedSymbol(''); setShowDropdown(true) }}
+                  onFocus={() => setShowDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+                  placeholder={stockLoading ? 'Loading stocks…' : 'Search symbol, name, or sector…'}
+                  disabled={stockLoading}
                 />
-              </div>
-
-              <div className="test-field">
-                <label className="test-label" htmlFor="stock-select">Choose symbol</label>
-                <select
-                  id="stock-select"
-                  className="test-select"
-                  value={selectedSymbol}
-                  onChange={(e) => setSelectedSymbol(e.target.value)}
-                  disabled={stockLoading || filteredStocks.length === 0}
-                >
-                  {filteredStocks.length === 0 && <option value="">No matching stocks</option>}
-                  {filteredStocks.map((stock) => (
-                    <option key={stock.symbol} value={stock.symbol}>
-                      {stock.symbol} - {stock.name}
-                    </option>
-                  ))}
-                </select>
+                {showDropdown && filteredStocks.length > 0 && (
+                  <div className="stock-dropdown">
+                    {filteredStocks.map((stock) => (
+                      <div
+                        key={stock.symbol}
+                        className={`stock-option${selectedSymbol === stock.symbol ? ' selected' : ''}`}
+                        onMouseDown={() => {
+                          setSelectedSymbol(stock.symbol)
+                          setStockQuery(`${stock.symbol} — ${stock.name}`)
+                          setShowDropdown(false)
+                        }}
+                      >
+                        <span className="stock-sym">{stock.symbol}</span>
+                        <span className="stock-name">{stock.name}</span>
+                        <span className="stock-sector">{stock.sector}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="test-field">
