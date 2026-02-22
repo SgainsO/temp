@@ -37,8 +37,11 @@
 /* ── Shell ─────────────────────────────────────────────────────────────── */
 #root {
   width: 100%;
-  min-width: 360px;
+  height: 100%;
+  padding: 5%;
+  min-width: 400px;
   background: #0d1526;
+  align-items: stretch;
   overflow: hidden;
 }
 
@@ -947,7 +950,7 @@
   bottom: calc(100% + 7px);
   left: 50%;
   transform: translateX(-50%);
-  width: 210px;
+  width: 190px;
   background: #0c1524;
   border: 1px solid #2a4a70;
   border-radius: 6px;
