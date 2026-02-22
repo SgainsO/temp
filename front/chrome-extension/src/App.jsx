@@ -289,6 +289,7 @@ function App() {
   const [divLoading,     setDivLoading]     = useState(false)
   const [divError,       setDivError]       = useState(null)
   const [expandedSector, setExpandedSector] = useState(null)
+  const [hideUnknown,    setHideUnknown]    = useState(false)
 
   const [optResult,  setOptResult]  = useState(null)
   const [optLoading, setOptLoading] = useState(false)
@@ -312,7 +313,7 @@ function App() {
   useEffect(() => { loadStockChoices() }, [])
 
   useEffect(() => {
-    if (holdings.length > 0) runDiversity(holdings)
+    if (holdings.length > 0) runDiversity(holdings, hideUnknown)
     else setDivResult(null)
   }, [holdings])
 
@@ -362,13 +363,13 @@ function App() {
   }
 
   // ── Diversity API ─────────────────────────────────────────────────────────
-  const runDiversity = async (data) => {
+  const runDiversity = async (data, hide_unknown = false) => {
     setDivLoading(true)
     try {
       const resp = await fetch(`${API}/api/diversity`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ holdings: data }),
+        body:    JSON.stringify({ holdings: data, hide_unknown }),
       })
       if (!resp.ok) throw new Error(`Server ${resp.status}`)
       setDivResult(await resp.json())
@@ -646,6 +647,16 @@ function App() {
               <div className="sectors">
                 <div className="sec-header">
                   <span className="sec-title">Where Your Money Is</span>
+                  <button
+                    className={`unknown-toggle ${hideUnknown ? 'active' : ''}`}
+                    onClick={() => {
+                      const next = !hideUnknown
+                      setHideUnknown(next)
+                      if (holdings.length > 0) runDiversity(holdings, next)
+                    }}
+                  >
+                    {hideUnknown ? 'Show Unknown' : 'Hide Unknown'}
+                  </button>
                   <span className="sec-badge">{divResult.industry_breakdown.length} sectors</span>
                 </div>
                 {divResult.industry_breakdown.map((item, i) => {

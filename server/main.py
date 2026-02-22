@@ -29,6 +29,7 @@ HOLDINGS_FILE = Path("holdings.json")
 
 class DiversityRequest(BaseModel):
     holdings: list[Any] = []
+    hide_unknown: bool = False
 
 
 class OptimizeRequest(BaseModel):
@@ -66,16 +67,18 @@ def health():
 def diversity(req: DiversityRequest):
     holdings = clean_holdings(req.holdings)
 
-    # Mutual funds are listed but excluded from diversity metrics
-    active  = [h for h in holdings if not h["mutual_fund"]]
-    fund_value = sum(h["value"] for h in holdings if h["mutual_fund"])
+    # Mutual funds and Unknown-sector holdings are excluded from diversity metrics
+    active       = [h for h in holdings if not h["mutual_fund"] and h["industry"] != "Unknown"]
+    fund_value   = sum(h["value"] for h in holdings if h["mutual_fund"])
+    unknown_value = sum(h["value"] for h in holdings if not h["mutual_fund"] and h["industry"] == "Unknown")
 
     result = calc_industry_totals(active)
     breakdown = result["breakdown"]
     active_total = result["total_value"]
-    total_value = active_total + fund_value
+    # When hide_unknown, exclude unknown value from the total so weights re-normalise
+    total_value = active_total + fund_value + (0 if req.hide_unknown else unknown_value)
 
-    # Metrics use only active (non-mutual-fund) holdings
+    # Metrics use only active (non-mutual-fund, non-unknown) holdings
     hhi = calc_hhi(breakdown)
     entropy = calc_entropy(breakdown)
     effective_industries = math.exp(entropy) if entropy > 0 else 0
@@ -103,6 +106,12 @@ def diversity(req: DiversityRequest):
             "industry": "Mutual Funds",
             "value": round(fund_value, 2),
             "weight_pct": round(fund_value / total_value * 100, 2) if total_value > 0 else 0.0,
+        })
+    if unknown_value > 0 and not req.hide_unknown:
+        display.append({
+            "industry": "Unknown",
+            "value": round(unknown_value, 2),
+            "weight_pct": round(unknown_value / total_value * 100, 2) if total_value > 0 else 0.0,
         })
     display.sort(key=lambda x: x["value"], reverse=True)
 
