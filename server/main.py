@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from compute_volatility import analyze_tickers_volatility
+from compute_volatility import analyze_tickers_volatility, get_close_prices
 from diversity import calc_entropy, calc_hhi, calc_industry_totals, clean_holdings, rating_from_hhi
 from optimize import optimize_sharpe
 from test_stock import list_stock_choices, simulate_add_stock
@@ -142,7 +142,7 @@ def _parse_currency(val: Any) -> float:
         return 0.0
 
 
-_SKIP = {"pending activity", "account total", "grand total", "account:", "—", "-", ""}
+_SKIP = {"pending activity", "account total", "grand total", "account:", "—", "-", "", "CASH"}
 
 
 @app.post("/api/optimize-from-holdings")
@@ -202,6 +202,25 @@ def simulate_add(req: SimulateAddRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/get-csv-of-stocks/{date}")
+def get_stocks_csv(date: str):
+    if not HOLDINGS_FILE.exists():
+        raise HTTPException(status_code=404, detail="No holdings saved yet.")
+    with open(HOLDINGS_FILE) as f:
+        entry = json.load(f)
+    holdings_data = entry.get("data", [])
+    arr = list({
+        h.get("symbol", "").strip().upper()
+        for h in holdings_data
+        if h.get("symbol", "").strip()
+        and h.get("symbol", "").strip().upper() not in _SKIP
+    })
+    if not arr:
+        raise HTTPException(status_code=400, detail="No valid tickers found in holdings.")
+    out_path = f"stocks_{date}.csv"
+    get_close_prices(arr, "1y").to_csv(out_path)
+    return {"ok": True, "file": out_path, "tickers": arr, "len" : len(arr)}
 
 # ── Dev entry point ───────────────────────────────────────────────────────────
 
