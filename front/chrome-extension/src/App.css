@@ -137,7 +137,7 @@
 /* ── Tabs ──────────────────────────────────────────────────────────────── */
 .tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 6px;
 }
 .tab-btn {
@@ -694,6 +694,102 @@
 .wt-delta.up   { color: #00ff88; }
 .wt-delta.down { color: #ff4757; }
 .wt-delta.flat { color: #2e4a6a; }
+
+/* ── Test Stock Tab ────────────────────────────────────────────────────────── */
+.test-note {
+  font-size: 10px;
+  color: #4a6a88;
+  line-height: 1.6;
+  padding: 8px 10px;
+  background: rgba(0,212,255,0.04);
+  border: 1px solid rgba(0,212,255,0.1);
+  border-radius: 5px;
+  animation: fade-up 0.3s ease;
+}
+
+.test-controls {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.test-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.test-label {
+  font-family: ui-monospace, 'Cascadia Code', 'Courier New', monospace;
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  color: #2e4a6a;
+  text-transform: uppercase;
+}
+
+.test-input,
+.test-select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 5px;
+  border: 1px solid #1e3050;
+  background: #162035;
+  color: #c9d8ed;
+  font-family: ui-monospace, 'Cascadia Code', 'Courier New', monospace;
+  font-size: 10px;
+  outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+
+.test-input:focus,
+.test-select:focus {
+  border-color: rgba(0,212,255,0.5);
+  box-shadow: 0 0 0 2px rgba(0,212,255,0.1);
+}
+
+.test-input::placeholder {
+  color: #3a5578;
+}
+
+.test-select:disabled {
+  color: #3a5578;
+}
+
+.test-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.test-box {
+  background: #162035;
+  border: 1px solid #1e3050;
+  border-radius: 6px;
+  padding: 9px 10px;
+  animation: fade-up 0.3s ease;
+}
+
+.test-box-title {
+  font-family: ui-monospace, 'Cascadia Code', 'Courier New', monospace;
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  color: #00d4ff;
+  text-transform: uppercase;
+  margin-bottom: 7px;
+}
+
+.test-line {
+  font-family: ui-monospace, 'Cascadia Code', 'Courier New', monospace;
+  font-size: 10px;
+  color: #8aaccc;
+  line-height: 1.6;
+}
+
+.test-box-sub {
+  font-size: 9px;
+  color: #3a5578;
+  line-height: 1.5;
+}
 
 /* ── Empty State ───────────────────────────────────────────────────────── */
 .empty {
