@@ -56,25 +56,42 @@ def health():
 @app.post("/api/diversity")
 def diversity(req: DiversityRequest):
     holdings = clean_holdings(req.holdings)
-    result = calc_industry_totals(holdings)
-    breakdown = result["breakdown"]
-    total_value = result["total_value"]
 
+    # Mutual funds are listed but excluded from diversity metrics
+    active  = [h for h in holdings if not h["mutual_fund"]]
+    fund_value = sum(h["value"] for h in holdings if h["mutual_fund"])
+
+    result = calc_industry_totals(active)
+    breakdown = result["breakdown"]
+    active_total = result["total_value"]
+    total_value = active_total + fund_value
+
+    # Metrics use only active (non-mutual-fund) holdings
     hhi = calc_hhi(breakdown)
     entropy = calc_entropy(breakdown)
     effective_industries = math.exp(entropy) if entropy > 0 else 0
     top_industry_weight = breakdown[0]["weight_pct"] if breakdown else 0
 
+    # Build display breakdown: weight_pct relative to full portfolio
+    display = [
+        {
+            "industry": r["industry"],
+            "value": round(r["value"], 2),
+            "weight_pct": round(r["value"] / total_value * 100, 2) if total_value > 0 else 0.0,
+        }
+        for r in breakdown
+    ]
+    if fund_value > 0:
+        display.append({
+            "industry": "Mutual Funds",
+            "value": round(fund_value, 2),
+            "weight_pct": round(fund_value / total_value * 100, 2) if total_value > 0 else 0.0,
+        })
+    display.sort(key=lambda x: x["value"], reverse=True)
+
     return {
         "total_value": total_value,
-        "industry_breakdown": [
-            {
-                "industry": r["industry"],
-                "value": round(r["value"], 2),
-                "weight_pct": round(r["weight_pct"], 2),
-            }
-            for r in breakdown
-        ],
+        "industry_breakdown": display,
         "metrics": {
             "hhi": round(hhi),
             "entropy": round(entropy, 4),
@@ -116,7 +133,7 @@ def _parse_currency(val: Any) -> float:
         return 0.0
 
 
-_SKIP = {"pending activity", "account total", "—", "-", ""}
+_SKIP = {"pending activity", "account total", "grand total", "account:", "—", "-", ""}
 
 
 @app.post("/api/optimize-from-holdings")
