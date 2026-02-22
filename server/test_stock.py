@@ -9,29 +9,29 @@ _SKIP_SYMBOLS = {"pending activity", "account total", "-", "", "cash", "account:
 _VALUE_KEYS = ("value", "currentValue", "curVal", "cur_val", "current_value")
 
 
-def _parse_currency(value: Any) -> float: # cleans up currency data to simple float
+def _parse_currency(value: Any) -> float:
     if isinstance(value, (int, float)):
         return float(value)
-    cleaned = re.sub(r"[^0-9.\-]", "", str(value)) # removes $ , etc.
+    cleaned = re.sub(r"[^0-9.\-]", "", str(value))
     try:
         return float(cleaned)
     except ValueError:
         return 0.0
 
 
-def _load_market_rows() -> list[dict[str, str]]: # returns csv file of stocks as dict
+def _load_market_rows() -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     with _CSV_PATH.open("r", encoding="utf-8", newline="") as csv_file:
         reader = csv.DictReader(csv_file)
         for row in reader:
-            item = { # turns csv to dict
+            item = {
                 "name": (row.get("name") or "").strip(),
-                "symbol": (row.get("symbol") or "").strip().upper(),
+                "symbol": (row.get("ticker") or "").strip().upper(),
                 "sector": (row.get("sector") or "").strip(),
                 "industry": (row.get("industry") or "").strip(),
                 "market": (row.get("market") or "").strip(),
             }
-            if item["symbol"]: # if key exists, add to dict
+            if item["symbol"]:
                 rows.append(item)
     return rows
 
@@ -40,14 +40,14 @@ _MARKET_ROWS = _load_market_rows()
 _SYMBOL_TO_SECTOR = {row["symbol"]: row["sector"] for row in _MARKET_ROWS}
 
 
-def _holding_value(row: dict[str, Any]) -> float: # returns holding value
+def _holding_value(row: dict[str, Any]) -> float:
     for key in _VALUE_KEYS:
         if key in row:
             return _parse_currency(row.get(key))
     return 0.0
 
 
-def _clean_for_diversity(raw_holdings: list[dict[str, Any]]) -> list[dict[str, Any]]: # clean input for diversity check
+def _clean_for_diversity(raw_holdings: list[dict[str, Any]]) -> list[dict[str, Any]]:
     cleaned: list[dict[str, Any]] = []
     for row in raw_holdings:
         symbol = str(row.get("symbol", "") or "").strip().upper()
@@ -58,7 +58,7 @@ def _clean_for_diversity(raw_holdings: list[dict[str, Any]]) -> list[dict[str, A
     return cleaned
 
 
-def _calc_industry_totals(holdings: list[dict[str, Any]]) -> dict[str, Any]: # return industry and total value in industry
+def _calc_industry_totals(holdings: list[dict[str, Any]]) -> dict[str, Any]:
     totals: dict[str, float] = {}
     total_value = 0.0
     for row in holdings:
@@ -66,7 +66,7 @@ def _calc_industry_totals(holdings: list[dict[str, Any]]) -> dict[str, Any]: # r
         totals[row["industry"]] = totals.get(row["industry"], 0.0) + row["value"]
 
     breakdown = []
-    for industry, value in totals.items(): # calculate industry value to total portfolio value
+    for industry, value in totals.items():
         weight_pct = (value / total_value * 100) if total_value > 0 else 0.0
         breakdown.append({"industry": industry, "value": value, "weight_pct": weight_pct})
     breakdown.sort(key=lambda x: x["value"], reverse=True)
@@ -97,7 +97,7 @@ def _rating_from_hhi(hhi: float) -> str:
     return "Concentrated"
 
 
-def _format_diversity(raw_holdings: list[dict[str, Any]]) -> dict[str, Any]:
+def format_diversity(raw_holdings: list[dict[str, Any]]) -> dict[str, Any]:
     cleaned = _clean_for_diversity(raw_holdings)
     result = _calc_industry_totals(cleaned)
     breakdown = result["breakdown"]
@@ -130,18 +130,14 @@ def _format_diversity(raw_holdings: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _extract_weighted_tickers(raw_holdings: list[dict[str, Any]]) -> tuple[list[str], dict[str, float]]:
     symbol_values: dict[str, float] = {}
-
     for row in raw_holdings:
         symbol = str(row.get("symbol", "") or "").strip().upper()
         if not symbol or symbol.lower() in _SKIP_SYMBOLS:
             continue
-
         value = _holding_value(row)
         if value <= 0:
             continue
-
         symbol_values[symbol] = symbol_values.get(symbol, 0.0) + value
-
     tickers = list(symbol_values.keys())
     return tickers, symbol_values
 
@@ -151,7 +147,6 @@ def _safe_optimize(tickers: list[str], period: str, risk_free: float) -> dict[st
         return {"error": "Need at least 2 tickers for optimization."}
     try:
         from optimize import optimize_sharpe
-
         return optimize_sharpe(tickers, period=period, risk_free=risk_free)
     except Exception as exc:
         return {"error": str(exc)}
@@ -162,14 +157,12 @@ def _safe_volatility(tickers: list[str], period: str) -> dict[str, Any]:
         return {"error": "No valid tickers for volatility analysis."}
     try:
         from compute_volatility import analyze_tickers_volatility
-
         return analyze_tickers_volatility(tickers, period=period)
     except Exception as exc:
         return {"error": str(exc)}
 
 
 def list_stock_choices(search: str | None = None, sector: str | None = None, limit: int | None = 200) -> list[dict[str, str]]:
-    """Return stock dropdown choices from stock_market.csv."""
     rows: list[dict[str, str]] = []
     search_norm = (search or "").strip().lower()
     sector_norm = (sector or "").strip().lower()
@@ -179,10 +172,8 @@ def list_stock_choices(search: str | None = None, sector: str | None = None, lim
             haystack = f'{item["symbol"]} {item["name"]}'.lower()
             if search_norm not in haystack:
                 continue
-
         if sector_norm and item["sector"].lower() != sector_norm:
             continue
-
         rows.append(item)
 
     rows.sort(key=lambda r: (r["symbol"], r["name"]))
@@ -198,7 +189,6 @@ def simulate_add_stock(
     period: str = "1y",
     risk_free: float = 0.0,
 ) -> dict[str, Any]:
-    """Simulate adding one test stock and return before/after backend score payloads."""
     symbol = (added_symbol or "").strip().upper()
     if not symbol:
         raise ValueError("added_symbol is required.")
@@ -223,18 +213,17 @@ def simulate_add_stock(
             "risk_free": risk_free,
         },
         "baseline": {
-            "diversity": _format_diversity(base_holdings),
+            "diversity": format_diversity(base_holdings),
             "optimize": _safe_optimize(base_tickers, period=period, risk_free=risk_free),
             "volatility": _safe_volatility(base_tickers, period=period),
             "tickers": base_tickers,
             "value_by_ticker": {k: round(v, 2) for k, v in base_values.items()},
         },
         "simulated": {
-            "diversity": _format_diversity(simulated_holdings),
+            "diversity": format_diversity(simulated_holdings),
             "optimize": _safe_optimize(sim_tickers, period=period, risk_free=risk_free),
             "volatility": _safe_volatility(sim_tickers, period=period),
             "tickers": sim_tickers,
             "value_by_ticker": {k: round(v, 2) for k, v in sim_values.items()},
         },
     }
-

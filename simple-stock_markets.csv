@@ -1,0 +1,560 @@
+ticker,industry_generic
+MMM,Other
+AOS,Industry & transport
+AES,Utilities & power
+APA,Energy
+ASML,Tech & connectivity
+T,Tech & connectivity
+ABBV,Health & life science
+ABT,Health & life science
+ACN,Tech & connectivity
+ADBE,Tech & connectivity
+AMD,Tech & connectivity
+AFL,Money & risk
+A,Health & life science
+APD,Materials & mining
+ABNB,Hi-fi living
+AKAM,Tech & connectivity
+ALB,Materials & mining
+ARE,Real estate & property
+ALGN,Health & life science
+ALLE,Services
+LNT,Utilities & power
+ALL,Money & risk
+ALNY,Health & life science
+GOOGL,Tech & connectivity
+GOOG,Tech & connectivity
+MO,Everyday essentials
+AMZN,Tech & connectivity
+AMCR,Industry & transport
+AEE,Utilities & power
+AEP,Utilities & power
+AXP,Money & risk
+AIG,Money & risk
+AMT,Real estate & property
+AWK,Utilities & power
+AMP,Money & risk
+AME,Industry & transport
+AMGN,Health & life science
+APH,Tech & connectivity
+ADI,Tech & connectivity
+AON,Money & risk
+APO,Money & risk
+APP,Services
+AAPL,Tech & connectivity
+AMAT,Tech & connectivity
+APTV,Hi-fi living
+ACGL,Money & risk
+ADM,Everyday essentials
+ARES,Money & risk
+ANET,Tech & connectivity
+ARM,Tech & connectivity
+AJG,Money & risk
+AIZ,Money & risk
+TEAM,Tech & connectivity
+ATO,Utilities & power
+AZO,Hi-fi living
+ADSK,Tech & connectivity
+ADP,Tech & connectivity
+AVB,Real estate & property
+AVY,Industry & transport
+AXON,Industry & transport
+BK,Money & risk
+BXP,Real estate & property
+BKR,Energy
+BALL,Industry & transport
+BAC,Money & risk
+BAX,Health & life science
+BDX,Health & life science
+BRK-B,Money & risk
+BBY,Hi-fi living
+TECH,Health & life science
+BIIB,Health & life science
+BLK,Money & risk
+BX,Money & risk
+XYZ,Tech & connectivity
+BA,Industry & transport
+BKNG,Hi-fi living
+BSX,Health & life science
+BMY,Health & life science
+AVGO,Tech & connectivity
+BR,Tech & connectivity
+BRO,Money & risk
+BF-B,Everyday essentials
+BLDR,Industry & transport
+BG,Everyday essentials
+BZFD,Tech & connectivity
+CHRW,Industry & transport
+CBRE,Real estate & property
+CDW,Tech & connectivity
+CF,Everyday essentials
+CME,Money & risk
+CMS,Utilities & power
+CRH,Materials & mining
+CSX,Industry & transport
+CVS,Health & life science
+CDNS,Tech & connectivity
+CPT,Real estate & property
+CPB,Everyday essentials
+COF,Money & risk
+CAH,Health & life science
+CCL,Hi-fi living
+CARR,Industry & transport
+CVNA,Hi-fi living
+CAT,Industry & transport
+CBOE,Money & risk
+COR,Health & life science
+CNC,Health & life science
+CNP,Utilities & power
+CRL,Health & life science
+SCHW,Money & risk
+CHTR,Tech & connectivity
+CVX,Energy
+CMG,Hi-fi living
+CB,Money & risk
+CHD,Everyday essentials
+CIEN,Tech & connectivity
+CI,Health & life science
+CINF,Money & risk
+CTAS,Services
+CSCO,Tech & connectivity
+C,Money & risk
+CFG,Money & risk
+CLX,Everyday essentials
+CSGP,Real estate & property
+KO,Everyday essentials
+CCEP,Everyday essentials
+CTSH,Tech & connectivity
+COIN,Money & risk
+CL,Everyday essentials
+CMCSA,Tech & connectivity
+FIX,Industry & transport
+CAG,Everyday essentials
+COP,Energy
+ED,Utilities & power
+STZ,Everyday essentials
+CEG,Utilities & power
+COO,Health & life science
+CPRT,Services
+GLW,Tech & connectivity
+CPAY,Tech & connectivity
+CTVA,Everyday essentials
+COST,Hi-fi living
+CTRA,Energy
+CRWD,Tech & connectivity
+CCI,Real estate & property
+CMI,Industry & transport
+DHI,Industry & transport
+DTE,Utilities & power
+DVA,Health & life science
+DHR,Health & life science
+DRI,Hi-fi living
+DDOG,Tech & connectivity
+DECK,Hi-fi living
+DE,Industry & transport
+DELL,Tech & connectivity
+DAL,Hi-fi living
+DVN,Energy
+DXCM,Health & life science
+FANG,Energy
+DLR,Real estate & property
+DG,Hi-fi living
+DLTR,Hi-fi living
+D,Utilities & power
+DPZ,Hi-fi living
+DASH,Tech & connectivity
+DOV,Industry & transport
+DOW,Materials & mining
+DD,Materials & mining
+DUK,Utilities & power
+EOG,Energy
+EPAM,Tech & connectivity
+EQT,Energy
+ETN,Industry & transport
+ECL,Materials & mining
+EIX,Utilities & power
+EW,Health & life science
+EA,Tech & connectivity
+ELV,Health & life science
+EME,Industry & transport
+EMR,Industry & transport
+ETR,Utilities & power
+EFX,Services
+EQIX,Real estate & property
+EQR,Real estate & property
+ERIE,Money & risk
+ESS,Real estate & property
+EL,Everyday essentials
+EG,Money & risk
+EVRG,Utilities & power
+ES,Utilities & power
+EXC,Utilities & power
+EXE,Energy
+EXPE,Hi-fi living
+EXPD,Industry & transport
+EXR,Real estate & property
+XOM,Energy
+FFIV,Tech & connectivity
+FDS,Money & risk
+FICO,Tech & connectivity
+FAST,Industry & transport
+FDX,Industry & transport
+FRT,Real estate & property
+FER,Industry & transport
+FXAIX,Unknown
+FIS,Tech & connectivity
+FSKAX,Unknown
+FITB,Money & risk
+FSLR,Energy
+FE,Utilities & power
+FISV,Unknown
+F,Hi-fi living
+FTNT,Tech & connectivity
+FTV,Health & life science
+FOXA,Hi-fi living
+FOX,Hi-fi living
+BEN,Money & risk
+FCX,Materials & mining
+GE,Industry & transport
+GEHC,Health & life science
+GEV,Industry & transport
+GRMN,Health & life science
+IT,Tech & connectivity
+GEN,Tech & connectivity
+GNRC,Industry & transport
+GD,Industry & transport
+GIS,Everyday essentials
+GM,Hi-fi living
+GPC,Hi-fi living
+GILD,Health & life science
+GPN,Services
+GL,Money & risk
+GDDY,Tech & connectivity
+GS,Money & risk
+HCA,Health & life science
+HPQ,Tech & connectivity
+HAL,Energy
+HIG,Money & risk
+HAS,Hi-fi living
+DOC,Real estate & property
+HSIC,Health & life science
+HSY,Everyday essentials
+HPE,Tech & connectivity
+HLT,Hi-fi living
+HOLX,Health & life science
+HD,Hi-fi living
+HON,Other
+HRL,Everyday essentials
+HST,Real estate & property
+HWM,Industry & transport
+HUBB,Industry & transport
+HUM,Health & life science
+HBAN,Money & risk
+HII,Industry & transport
+IBM,Tech & connectivity
+IEX,Industry & transport
+IQV,Health & life science
+IDXX,Health & life science
+ITW,Industry & transport
+INCY,Health & life science
+IR,Industry & transport
+INSM,Health & life science
+PODD,Health & life science
+INTC,Tech & connectivity
+IBKR,Money & risk
+ICE,Money & risk
+IFF,Materials & mining
+IP,Industry & transport
+INTU,Tech & connectivity
+ISRG,Health & life science
+IVZ,Money & risk
+QQQ,Unknown
+INVH,Real estate & property
+IRM,Real estate & property
+JBHT,Industry & transport
+SJM,Everyday essentials
+JPM,Money & risk
+JBL,Tech & connectivity
+JKHY,Tech & connectivity
+J,Industry & transport
+JNJ,Health & life science
+JCI,Industry & transport
+KKR,Money & risk
+KLAC,Tech & connectivity
+KVUE,Everyday essentials
+KDP,Everyday essentials
+KEY,Money & risk
+KEYS,Health & life science
+KMB,Everyday essentials
+KIM,Real estate & property
+KMI,Energy
+KHC,Everyday essentials
+KR,Everyday essentials
+LHX,Industry & transport
+LH,Health & life science
+LRCX,Tech & connectivity
+LW,Everyday essentials
+LVS,Hi-fi living
+LDOS,Tech & connectivity
+LEN,Industry & transport
+LII,Industry & transport
+LLY,Health & life science
+LIN,Materials & mining
+LYV,Hi-fi living
+LMT,Industry & transport
+L,Money & risk
+LOW,Hi-fi living
+LULU,Hi-fi living
+LYB,Materials & mining
+MTB,Money & risk
+MGM,Hi-fi living
+MSCI,Money & risk
+MPC,Energy
+MAR,Hi-fi living
+MRSH,Money & risk
+MLM,Materials & mining
+MRVL,Tech & connectivity
+MAS,Industry & transport
+MA,Money & risk
+MTCH,Tech & connectivity
+MKC,Everyday essentials
+MCD,Hi-fi living
+MCK,Health & life science
+MDT,Health & life science
+MELI,Tech & connectivity
+MRK,Health & life science
+MET,Money & risk
+META,Tech & connectivity
+MTD,Health & life science
+MSTR,Tech & connectivity
+MCHP,Tech & connectivity
+MU,Tech & connectivity
+MSFT,Tech & connectivity
+MAA,Real estate & property
+MRNA,Health & life science
+MOH,Health & life science
+TAP,Everyday essentials
+MDLZ,Everyday essentials
+MPWR,Tech & connectivity
+MNST,Everyday essentials
+MCO,Money & risk
+MS,Money & risk
+MOS,Everyday essentials
+MSI,Tech & connectivity
+NRG,Utilities & power
+NVR,Industry & transport
+NXPI,Tech & connectivity
+NDAQ,Money & risk
+NTAP,Tech & connectivity
+NFLX,Hi-fi living
+NEM,Materials & mining
+NWSA,Hi-fi living
+NWS,Hi-fi living
+NEE,Utilities & power
+NXT,Energy
+NI,Utilities & power
+NKE,Hi-fi living
+NDSN,Industry & transport
+NSC,Industry & transport
+NTRS,Money & risk
+NOC,Industry & transport
+NCLH,Hi-fi living
+NUE,Materials & mining
+NVDA,Tech & connectivity
+ON,Tech & connectivity
+OXY,Energy
+ODFL,Industry & transport
+OMC,Services
+OKE,Energy
+ORCL,Tech & connectivity
+OGN,Health & life science
+OTIS,Industry & transport
+ORLY,Hi-fi living
+PDD,Tech & connectivity
+PCG,Utilities & power
+PNC,Money & risk
+PPG,Materials & mining
+PPL,Utilities & power
+PTC,Tech & connectivity
+PCAR,Industry & transport
+PKG,Industry & transport
+PLTR,Tech & connectivity
+PANW,Tech & connectivity
+PSKY,Hi-fi living
+PH,Industry & transport
+PYPL,Money & risk
+PAYX,Tech & connectivity
+PAYC,Tech & connectivity
+PTON,Hi-fi living
+PNR,Industry & transport
+PEP,Everyday essentials
+PFE,Health & life science
+PM,Everyday essentials
+PSX,Energy
+PNW,Utilities & power
+POOL,Industry & transport
+PFG,Money & risk
+PG,Everyday essentials
+PGR,Money & risk
+PLD,Real estate & property
+PRU,Money & risk
+PEG,Utilities & power
+PSA,Real estate & property
+PHM,Industry & transport
+Q,Tech & connectivity
+QCOM,Tech & connectivity
+PWR,Industry & transport
+DGX,Health & life science
+RTX,Industry & transport
+RL,Hi-fi living
+RJF,Money & risk
+O,Real estate & property
+REG,Real estate & property
+REGN,Health & life science
+RF,Money & risk
+RSG,Services
+RMD,Health & life science
+RVTY,Health & life science
+RIVN,Hi-fi living
+HOOD,Money & risk
+RKLB,Industry & transport
+ROK,Industry & transport
+ROL,Other
+ROP,Tech & connectivity
+ROST,Hi-fi living
+RCL,Hi-fi living
+SPGI,Money & risk
+SBAC,Real estate & property
+GLD,Unknown
+CRM,Tech & connectivity
+SNDK,Tech & connectivity
+SLB,Energy
+SWTSX,Unknown
+SCHB,Unknown
+SCHG,Unknown
+SCHV,Unknown
+SCHH,Unknown
+SCHD,Unknown
+SWPPX,Unknown
+STX,Tech & connectivity
+SRE,Utilities & power
+NOW,Tech & connectivity
+SHW,Materials & mining
+SHOP,Tech & connectivity
+SPG,Real estate & property
+SWKS,Tech & connectivity
+SW,Industry & transport
+SNA,Industry & transport
+SOLV,Health & life science
+SONO,Tech & connectivity
+SO,Utilities & power
+LUV,Hi-fi living
+SWK,Industry & transport
+SBUX,Hi-fi living
+XLY,Unknown
+XLP,Unknown
+STT,Money & risk
+XLE,Unknown
+XLF,Unknown
+XLV,Unknown
+SPY,Unknown
+XLK,Unknown
+STLD,Materials & mining
+STE,Health & life science
+SYK,Health & life science
+STKL,Everyday essentials
+SMCI,Tech & connectivity
+SG,Hi-fi living
+SYF,Money & risk
+SNPS,Tech & connectivity
+SYY,Everyday essentials
+TMUS,Tech & connectivity
+TROW,Money & risk
+TEL,Tech & connectivity
+TJX,Hi-fi living
+TKO,Hi-fi living
+TTWO,Tech & connectivity
+TPR,Hi-fi living
+TRGP,Energy
+TGT,Hi-fi living
+TDY,Health & life science
+TER,Tech & connectivity
+TSLA,Hi-fi living
+TXN,Tech & connectivity
+TPL,Energy
+TXT,Industry & transport
+TMO,Health & life science
+TRI,Services
+TSCO,Hi-fi living
+TTD,Services
+TT,Industry & transport
+TDG,Industry & transport
+TRV,Money & risk
+TRMB,Health & life science
+TFC,Money & risk
+TYL,Tech & connectivity
+TSN,Everyday essentials
+USB,Money & risk
+UDR,Real estate & property
+UBER,Tech & connectivity
+ULTA,Hi-fi living
+UNP,Industry & transport
+UAL,Hi-fi living
+UPS,Industry & transport
+URI,Hi-fi living
+UNH,Health & life science
+UHS,Health & life science
+VLO,Energy
+VFIAX,Unknown
+VEA,Unknown
+VWO,Unknown
+VUG,Unknown
+VYM,Unknown
+VGT,Unknown
+VNQ,Unknown
+VOO,Unknown
+VOOG,Unknown
+VOOV,Unknown
+BND,Unknown
+VXUS,Unknown
+VTI,Unknown
+VTSAX,Unknown
+VTV,Unknown
+VTR,Real estate & property
+VLTO,Services
+VRSN,Tech & connectivity
+VRSK,Services
+VZ,Tech & connectivity
+VRTX,Health & life science
+VTRS,Health & life science
+VICI,Real estate & property
+V,Money & risk
+VST,Utilities & power
+VMC,Materials & mining
+WRB,Money & risk
+GWW,Industry & transport
+WEC,Utilities & power
+WAB,Industry & transport
+WMT,Hi-fi living
+DIS,Hi-fi living
+WBD,Hi-fi living
+WM,Services
+WAT,Health & life science
+WFC,Money & risk
+WELL,Real estate & property
+WST,Health & life science
+WDC,Tech & connectivity
+WY,Real estate & property
+WMB,Energy
+WSM,Hi-fi living
+WTW,Money & risk
+WDAY,Tech & connectivity
+WYNN,Hi-fi living
+XEL,Utilities & power
+XYL,Industry & transport
+YUM,Hi-fi living
+ZBRA,Tech & connectivity
+ZBH,Health & life science
+ZTS,Health & life science
+ZS,Tech & connectivity
+EBAY,Tech & connectivity
