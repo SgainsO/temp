@@ -20,5 +20,11 @@
       "matches": ["<all_urls>"],
       "js": ["content.js"]
     }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["Cluster_Analysis_.png"],
+      "matches": ["<all_urls>"]
+    }
   ]
 }

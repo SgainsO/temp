@@ -190,9 +190,10 @@ function App() {
   const [tab,      setTab]      = useState('diversity')
   const [holdings, setHoldings] = useState([])
 
-  const [divResult,  setDivResult]  = useState(null)
-  const [divLoading, setDivLoading] = useState(false)
-  const [divError,   setDivError]   = useState(null)
+  const [divResult,      setDivResult]      = useState(null)
+  const [divLoading,     setDivLoading]     = useState(false)
+  const [divError,       setDivError]       = useState(null)
+  const [expandedSector, setExpandedSector] = useState(null)
 
   const [optResult,  setOptResult]  = useState(null)
   const [optLoading, setOptLoading] = useState(false)
@@ -495,20 +496,38 @@ function App() {
                   <span className="sec-title">Where Your Money Is</span>
                   <span className="sec-badge">{divResult.industry_breakdown.length} sectors</span>
                 </div>
-                {divResult.industry_breakdown.map((item, i) => (
-                  <div key={i} className="sector-row">
-                    <div className="sector-top">
-                      <span className="sector-rank">{String(i + 1).padStart(2, '0')}</span>
-                      <span className="sector-name">{item.industry}</span>
-                      <span className="sector-val">${(item.value / 1000).toFixed(1)}k</span>
-                      <span className="sector-pct">{item.weight_pct}%</span>
+                {divResult.industry_breakdown.map((item, i) => {
+                  const stocks = divResult.industry_stocks?.[item.industry] ?? []
+                  const isOpen = expandedSector === item.industry
+                  return (
+                    <div key={i} className="sector-row">
+                      <div
+                        className="sector-top"
+                        style={{ cursor: stocks.length > 0 ? 'pointer' : 'default' }}
+                        onClick={() => stocks.length > 0 && setExpandedSector(isOpen ? null : item.industry)}
+                      >
+                        <span className="sector-rank">{String(i + 1).padStart(2, '0')}</span>
+                        <span className="sector-name">{item.industry}</span>
+                        <span className="sector-val">${(item.value / 1000).toFixed(1)}k</span>
+                        <span className="sector-pct">{item.weight_pct}%</span>
+                        {stocks.length > 0 && (
+                          <span className="sector-chevron">{isOpen ? '▴' : '▾'}</span>
+                        )}
+                      </div>
+                      <div className="bar-track">
+                        <div className="bar-fill"
+                             style={{ '--bar-w': `${item.weight_pct}%`, background: sectorColor(item.weight_pct) }} />
+                      </div>
+                      {isOpen && stocks.length > 0 && (
+                        <div className="sector-stocks">
+                          {stocks.map(sym => (
+                            <span key={sym} className="sector-stock-chip">{sym}</span>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <div className="bar-track">
-                      <div className="bar-fill"
-                           style={{ '--bar-w': `${item.weight_pct}%`, background: sectorColor(item.weight_pct) }} />
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
 

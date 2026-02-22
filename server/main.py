@@ -81,6 +81,14 @@ def diversity(req: DiversityRequest):
     effective_industries = math.exp(entropy) if entropy > 0 else 0
     top_industry_weight = breakdown[0]["weight_pct"] if breakdown else 0
 
+    # Build industry → [symbols] mapping for frontend drill-down
+    industry_stocks: dict[str, list[str]] = {}
+    for h in holdings:
+        sym = h.get("symbol", "")
+        if sym:
+            ind = "Mutual Funds" if h["mutual_fund"] else h["industry"]
+            industry_stocks.setdefault(ind, []).append(sym)
+
     # Build display breakdown: weight_pct relative to full portfolio
     display = [
         {
@@ -101,6 +109,7 @@ def diversity(req: DiversityRequest):
     return {
         "total_value": total_value,
         "industry_breakdown": display,
+        "industry_stocks": industry_stocks,
         "metrics": {
             "hhi": round(hhi),
             "entropy": round(entropy, 4),

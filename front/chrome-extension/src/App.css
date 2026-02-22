@@ -438,6 +438,28 @@
   border-bottom: 1px solid rgba(255,255,255,0.04);
 }
 .sector-row:last-child { border-bottom: none; }
+.sector-chevron {
+  font-size: 9px;
+  color: #5a7a9a;
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+.sector-stocks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 5px 0 3px 20px;
+}
+.sector-stock-chip {
+  font-family: ui-monospace, 'Cascadia Code', 'Courier New', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  color: #8aaccc;
+  background: rgba(90, 173, 222, 0.1);
+  border: 1px solid rgba(90, 173, 222, 0.2);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
 .sector-top {
   display: flex;
   align-items: center;
